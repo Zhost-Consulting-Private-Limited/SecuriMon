@@ -3,6 +3,7 @@ import 'express-async-errors'; // Handles async errors in express routes
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth';
+import agentRoutes from './routes/agent';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use('/v1/auth', authRoutes);
+app.use('/v1/agent', agentRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

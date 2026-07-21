@@ -19,14 +19,15 @@ This document tracks the current state of the project. Update this file at the e
 - [x] Batch C: Backend Authentication & Tenancy (Express, JWT, bcrypt, tenancy middleware).
 - [x] Batch D: Agent Skeleton & Installation Script (`main.go`, `config.go`, `install.sh`).
 - [x] Batch CC: GitHub workflow `build-agent.yml` implemented for cross-platform agent build (Linux/Windows) with 1-day artifact retention and Windows signing stub.
+- [x] Batch E & F: Agent Auto-Registration & Hardware Discovery (CPU, RAM, Network via gopsutil).
 
 ## What is Currently In Progress
-- Ready to start Phase 2 (Telemetry & Ingestion).
+- Ready to start Batch H (Backend Ingestion API) and metrics aggregation.
 
 ## Next Work Startup (Action Items)
-1. **Start Batch F (System & Hardware Discovery - Agent):**
-   - Implement OS, CPU, RAM, and Network interface detection in Go.
-   - Send inventory data to backend on startup.
+1. **Start Batch H & I (Metrics Aggregation):**
+   - We have the endpoints for telemetry ingestion already completed in `agent.ts`.
+   - Now need to implement background cron jobs in Node.js to downsample raw 1-minute metrics into 5-minute and hourly aggregates to keep the SQLite database small.
 
 ## Important Project Constraints
 - **Deployment:** Must be simple (PM2 + systemd/Windows Service). NO Docker or Kubernetes.

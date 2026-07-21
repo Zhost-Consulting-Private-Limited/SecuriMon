@@ -27,3 +27,13 @@ func LoadConfig(path string) (*Config, error) {
 
 	return &cfg, nil
 }
+
+// SaveConfig writes the configuration back to the local filesystem
+func SaveConfig(path string, cfg *Config) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0600)
+}

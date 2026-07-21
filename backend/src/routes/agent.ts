@@ -126,4 +126,116 @@ router.post('/:serverId/telemetry', authenticateAgent, async (req: AgentRequest,
   }
 });
 
+// Batch L: Threat Events Ingestion
+router.post('/:serverId/events', authenticateAgent, async (req: AgentRequest, res: Response) => {
+  const serverId = req.server.id;
+  const event = req.body;
+
+  if (!event.event_type || !event.occurred_at) {
+    return res.status(400).json({ error: 'event_type and occurred_at are required' });
+  }
+
+  try {
+    await prisma.threatEvent.create({
+      data: {
+        serverId,
+        eventType: event.event_type,
+        severity: event.severity || 'LOW',
+        sourceIp: event.source_ip,
+        detail: event.detail,
+        occurredAt: new Date(event.occurred_at),
+        autoRemediated: event.auto_remediated || false
+      }
+    });
+    
+    // Create Timeline event
+    await prisma.timelineEvent.create({
+      data: {
+        serverId,
+        eventCategory: 'security',
+        title: `Threat Detected: ${event.event_type}`,
+        description: event.detail,
+        occurredAt: new Date(event.occurred_at)
+      }
+    });
+
+    res.status(202).json({ message: 'Threat event recorded' });
+  } catch (error: any) {
+    console.error('Error saving threat event:', error);
+    res.status(500).json({ error: 'Failed to process threat event' });
+  }
+});
+
+// Batch L: Security Findings Ingestion & Batch M: Risk Scoring
+router.post('/:serverId/findings', authenticateAgent, async (req: AgentRequest, res: Response) => {
+  const serverId = req.server.id;
+  const { findings } = req.body;
+
+  if (!findings || !Array.isArray(findings)) {
+    return res.status(400).json({ error: 'findings array is required' });
+  }
+
+  try {
+    // 1. Calculate the Risk Score (Batch M)
+    // Simple logic: Start at 100, deduct points based on failed checks
+    let securityScore = 100;
+    for (const finding of findings) {
+      if (!finding.passed) {
+        if (finding.severity === 'CRITICAL') securityScore -= 30;
+        else if (finding.severity === 'HIGH') securityScore -= 15;
+        else if (finding.severity === 'MEDIUM') securityScore -= 5;
+        else securityScore -= 2;
+      }
+    }
+    securityScore = Math.max(0, securityScore);
+
+    // 2. Save the Scan and Findings
+    const scan = await prisma.securityScan.create({
+      data: {
+        serverId,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        riskScore: securityScore,
+        findings: {
+          create: findings.map((f: any) => ({
+            serverId,
+            ruleId: f.rule_id,
+            category: f.category,
+            severity: f.severity,
+            passed: f.passed,
+            autoFixable: f.auto_fixable,
+            businessImpactText: f.business_impact_text,
+            recommendedAction: f.recommended_action,
+            detail: f.detail
+          }))
+        }
+      }
+    });
+
+    // 3. Update the Server Score
+    await prisma.serverScore.upsert({
+      where: { 
+        // Upserting based on nearest hour to maintain historical scores
+        serverId_scoredAt: { 
+          serverId, 
+          scoredAt: new Date(Math.floor(Date.now() / 3600000) * 3600000) 
+        } 
+      },
+      update: { securityScore, overallScore: securityScore }, // MVP overall = security score
+      create: {
+        serverId,
+        scoredAt: new Date(Math.floor(Date.now() / 3600000) * 3600000),
+        securityScore,
+        overallScore: securityScore,
+        scoringAlgorithmVersion: '1.0'
+      }
+    });
+
+    res.status(202).json({ message: 'Security findings recorded', riskScore: securityScore });
+  } catch (error: any) {
+    console.error('Error saving findings:', error);
+    res.status(500).json({ error: 'Failed to process findings' });
+  }
+});
+
 export default router;

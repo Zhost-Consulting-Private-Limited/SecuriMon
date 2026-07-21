@@ -21,17 +21,18 @@ This document tracks the current state of the project. Update this file at the e
 - [x] Batch CC: GitHub workflow `build-agent.yml` implemented for cross-platform agent build (Linux/Windows) with 1-day artifact retention and Windows signing stub.
 - [x] Batch E & F: Agent Auto-Registration & Hardware Discovery (CPU, RAM, Network via gopsutil).
 - [x] Batch H & I: Backend Ingestion API and Metrics Aggregation Cron Jobs (Raw -> 5m -> Hourly) and Data Pruning.
+- [x] Batch J & K: Agent Security Scanner (SSH, UFW rules) & Threat Detection module (tailing `auth.log`).
+- [x] Batch L & M: Backend Findings API & Risk Scoring logic.
 
 ## What is Currently In Progress
-- Ready to start Phase 3 (Security & Threat Detection).
+- Ready to start Phase 4 (Remote Command & Remediation).
 
 ## Next Work Startup (Action Items)
-1. **Start Batch J & K (Security Hardening Scanner & Threat Detection - Agent):**
-   - Implement local scans for SSH config, UFW/iptables status, and file permissions in Go.
-   - Implement log tailing for `/var/log/auth.log` (SSH brute-force detection).
-2. **Start Batch L & M (Findings & Risk Scoring - Backend):**
-   - Create endpoints for `POST /v1/agent/:serverId/findings` and `/events`.
-   - Implement scoring logic to calculate Health and Security scores.
+1. **Start Batch N (Real-time Communication - WebSocket):**
+   - Setup WebSocket server (`ws` or `socket.io`) in the Node.js backend.
+   - Implement WebSocket client in the Go Agent for persistent connections.
+2. **Start Batch O (Remote Remediation Execution):**
+   - Agent-side command verification (e.g., executing block_ip).
 
 ## Important Project Constraints
 - **Deployment:** Must be simple (PM2 + systemd/Windows Service). NO Docker or Kubernetes.

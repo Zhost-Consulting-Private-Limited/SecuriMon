@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Defaulting to SQLite for development. 
+// For production, change provider to "postgresql".
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                String   @id @default(uuid())
+  name              String
+  plan              String   @default("free") // free | pro | business
+  parentMspTenantId String?
+  parentMspTenant   Tenant?  @relation("TenantToTenant", fields: [parentMspTenantId], references: [id])
+  managedTenants    Tenant[] @relation("TenantToTenant")
+  whiteLabelConfig  String? // Stored as JSON string
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users               User[]
+  installTokens       InstallToken[]
+  servers             Server[]
+  remediationPolicies RemediationPolicy[]
+  alertRules          AlertRule[]
+  complianceReports   ComplianceReport[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  email        String   @unique
+  passwordHash String
+  role         String   @default("member") // owner | admin | member | msp_admin
+  createdAt    DateTime @default(now())
+}
+
+model InstallToken {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  token     String    @unique
+  expiresAt DateTime?
+  usedCount Int       @default(0)
+}
+
+model Server {
+  id            String    @id @default(uuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  hostname      String
+  os            String?
+  osVersion     String?
+  kernelVersion String?
+  cloudProvider String?
+  publicIp      String?
+  privateIp     String?
+  environment   String?
+  project       String?
+  region        String?
+  customerLabel String?
+  tags          String? // Array stored as JSON string
+  apiKeyHash    String
+  agentVersion  String?
+  lastSeenAt    DateTime?
+  status        String    @default("pending") // pending | online | offline | decommissioned
+  createdAt     DateTime  @default(now())
+
+  inventory           ServerInventory[]
+  metricsRaw          MetricsRaw[]
+  applications        Application[]
+  securityScans       SecurityScan[]
+  securityFindings    SecurityFinding[]
+  threatEvents        ThreatEvent[]
+  timelineEvents      TimelineEvent[]
+  remediationActions  RemediationAction[]
+  alertRules          AlertRule[]
+  alertHistory        AlertHistory[]
+  complianceReports   ComplianceReport[]
+  backupStatus        BackupStatus?
+  costRecommendations CostRecommendation[]
+  scores              ServerScore[]
+}
+
+model ServerInventory {
+  id           String   @id @default(uuid())
+  serverId     String
+  server       Server   @relation(fields: [serverId], references: [id])
+  softwareName String
+  version      String?
+  detectedAt   DateTime @default(now())
+}
+
+model MetricsRaw {
+  serverId       String
+  server         Server   @relation(fields: [serverId], references: [id])
+  collectedAt    DateTime
+  cpuPercent     Float?
+  ramPercent     Float?
+  diskPercent    Float?
+  swapPercent    Float?
+  load1m         Float?
+  load5m         Float?
+  load15m        Float?
+  networkRxBytes BigInt?
+  networkTxBytes BigInt?
+  temperatureC   Float?
+
+  @@id([serverId, collectedAt])
+}
+
+model Application {
+  id              String    @id @default(uuid())
+  serverId        String
+  server          Server    @relation(fields: [serverId], references: [id])
+  managerType     String // pm2 | systemd | docker | kubernetes | supervisor
+  name            String
+  port            Int?
+  version         String?
+  status          String? // running | stopped | crash_loop
+  restartCount24h Int       @default(0)
+  lastRestartAt   DateTime?
+}
+
+model SecurityScan {
+  id          String    @id @default(uuid())
+  serverId    String
+  server      Server    @relation(fields: [serverId], references: [id])
+  startedAt   DateTime
+  completedAt DateTime?
+  riskScore   Int? // 0-100
+
+  findings SecurityFinding[]
+}
+
+model SecurityFinding {
+  id                 String       @id @default(uuid())
+  scanId             String
+  scan               SecurityScan @relation(fields: [scanId], references: [id])
+  serverId           String
+  server             Server       @relation(fields: [serverId], references: [id])
+  ruleId             String
+  category           String
+  severity           String // LOW | MEDIUM | HIGH | CRITICAL
+  passed             Boolean
+  autoFixable        Boolean      @default(false)
+  businessImpactText String?
+  recommendedAction  String?
+  estimatedFixTime   String?
+  status             String       @default("open") // open | fixed | ignored | fix_pending
+  detail             String? // Stored as JSON string
+  detectedAt         DateTime     @default(now())
+}
+
+model ThreatEvent {
+  id             String   @id @default(uuid())
+  serverId       String
+  server         Server   @relation(fields: [serverId], references: [id])
+  eventType      String
+  severity       String
+  sourceIp       String?
+  detail         String?
+  occurredAt     DateTime
+  autoRemediated Boolean  @default(false)
+}
+
+model TimelineEvent {
+  id            String   @id @default(uuid())
+  serverId      String
+  server        Server   @relation(fields: [serverId], references: [id])
+  eventCategory String
+  title         String
+  description   String?
+  occurredAt    DateTime @default(now())
+}
+
+model RemediationAction {
+  id           String    @id @default(uuid())
+  serverId     String
+  server       Server    @relation(fields: [serverId], references: [id])
+  triggeredBy  String // threat_event | finding | manual
+  triggerRefId String?
+  action       String
+  params       String? // Stored as JSON string
+  status       String    @default("pending") // pending | success | failed
+  initiatedAt  DateTime  @default(now())
+  completedAt  DateTime?
+}
+
+model RemediationPolicy {
+  id          String  @id @default(uuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  action      String
+  autoEnabled Boolean @default(false)
+}
+
+model AlertRule {
+  id              String  @id @default(uuid())
+  tenantId        String
+  tenant          Tenant  @relation(fields: [tenantId], references: [id])
+  serverId        String?
+  server          Server? @relation(fields: [serverId], references: [id])
+  metric          String
+  condition       String
+  channels        String // Array stored as JSON string
+  severityRouting String? // Stored as JSON string
+  enabled         Boolean @default(true)
+
+  alertHistory AlertHistory[]
+}
+
+model AlertHistory {
+  id             String    @id @default(uuid())
+  alertRuleId    String
+  alertRule      AlertRule @relation(fields: [alertRuleId], references: [id])
+  serverId       String
+  server         Server    @relation(fields: [serverId], references: [id])
+  firedAt        DateTime  @default(now())
+  resolvedAt     DateTime?
+  deliveryStatus String? // Stored as JSON string
+}
+
+model ComplianceReport {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  serverId    String?
+  server      Server?  @relation(fields: [serverId], references: [id])
+  framework   String
+  score       Int?
+  pdfUrl      String?
+  generatedAt DateTime @default(now())
+}
+
+model BackupStatus {
+  id                String    @id @default(uuid())
+  serverId          String    @unique
+  server            Server    @relation(fields: [serverId], references: [id])
+  lastBackupAt      DateTime?
+  backupSizeBytes   BigInt?
+  restoreTested     Boolean?  @default(false)
+  cloudSynced       Boolean?  @default(false)
+  lastFailureAt     DateTime?
+  lastFailureReason String?
+}
+
+model CostRecommendation {
+  id                      String   @id @default(uuid())
+  serverId                String
+  server                  Server   @relation(fields: [serverId], references: [id])
+  category                String
+  description             String?
+  estimatedMonthlySavings Float?
+  currency                String?  @default("USD")
+  detectedAt              DateTime @default(now())
+  status                  String   @default("open") // open | applied | dismissed
+}
+
+model ServerScore {
+  serverId                String
+  server                  Server   @relation(fields: [serverId], references: [id])
+  scoredAt                DateTime @default(now())
+  healthScore             Int?
+  performanceScore        Int?
+  securityScore           Int?
+  complianceScore         Int?
+  availabilityScore       Int?
+  backupScore             Int?
+  overallScore            Int?
+  scoringAlgorithmVersion String
+
+  @@id([serverId, scoredAt])
+}

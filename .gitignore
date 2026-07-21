@@ -1,0 +1,38 @@
+# Node.js
+backend/node_modules/
+frontend/node_modules/
+npm-debug.log
+yarn-error.log
+.env
+.env.local
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Go
+agent/bin/
+agent/obj/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Build/Artifacts
+dist/
+build/
+coverage/

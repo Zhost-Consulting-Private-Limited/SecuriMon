@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth';
 import agentRoutes from './routes/agent';
+import { startMetricsAggregator } from './jobs/metricsAggregator';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -27,7 +28,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Start Server
+// Start Server & Background Jobs
 app.listen(PORT, () => {
   console.log(`SecuriMon Core API & Ingestion running on http://localhost:${PORT}`);
+  startMetricsAggregator();
 });
+

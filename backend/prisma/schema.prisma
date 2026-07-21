@@ -71,6 +71,8 @@ model Server {
 
   inventory           ServerInventory[]
   metricsRaw          MetricsRaw[]
+  metrics5m           Metrics5m[]
+  metricsHourly       MetricsHourly[]
   applications        Application[]
   securityScans       SecurityScan[]
   securityFindings    SecurityFinding[]
@@ -95,6 +97,42 @@ model ServerInventory {
 }
 
 model MetricsRaw {
+  serverId       String
+  server         Server   @relation(fields: [serverId], references: [id])
+  collectedAt    DateTime
+  cpuPercent     Float?
+  ramPercent     Float?
+  diskPercent    Float?
+  swapPercent    Float?
+  load1m         Float?
+  load5m         Float?
+  load15m        Float?
+  networkRxBytes BigInt?
+  networkTxBytes BigInt?
+  temperatureC   Float?
+
+  @@id([serverId, collectedAt])
+}
+
+model Metrics5m {
+  serverId       String
+  server         Server   @relation(fields: [serverId], references: [id])
+  collectedAt    DateTime
+  cpuPercent     Float?
+  ramPercent     Float?
+  diskPercent    Float?
+  swapPercent    Float?
+  load1m         Float?
+  load5m         Float?
+  load15m        Float?
+  networkRxBytes BigInt?
+  networkTxBytes BigInt?
+  temperatureC   Float?
+
+  @@id([serverId, collectedAt])
+}
+
+model MetricsHourly {
   serverId       String
   server         Server   @relation(fields: [serverId], references: [id])
   collectedAt    DateTime

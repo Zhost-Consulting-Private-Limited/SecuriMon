@@ -20,14 +20,18 @@ This document tracks the current state of the project. Update this file at the e
 - [x] Batch D: Agent Skeleton & Installation Script (`main.go`, `config.go`, `install.sh`).
 - [x] Batch CC: GitHub workflow `build-agent.yml` implemented for cross-platform agent build (Linux/Windows) with 1-day artifact retention and Windows signing stub.
 - [x] Batch E & F: Agent Auto-Registration & Hardware Discovery (CPU, RAM, Network via gopsutil).
+- [x] Batch H & I: Backend Ingestion API and Metrics Aggregation Cron Jobs (Raw -> 5m -> Hourly) and Data Pruning.
 
 ## What is Currently In Progress
-- Ready to start Batch H (Backend Ingestion API) and metrics aggregation.
+- Ready to start Phase 3 (Security & Threat Detection).
 
 ## Next Work Startup (Action Items)
-1. **Start Batch H & I (Metrics Aggregation):**
-   - We have the endpoints for telemetry ingestion already completed in `agent.ts`.
-   - Now need to implement background cron jobs in Node.js to downsample raw 1-minute metrics into 5-minute and hourly aggregates to keep the SQLite database small.
+1. **Start Batch J & K (Security Hardening Scanner & Threat Detection - Agent):**
+   - Implement local scans for SSH config, UFW/iptables status, and file permissions in Go.
+   - Implement log tailing for `/var/log/auth.log` (SSH brute-force detection).
+2. **Start Batch L & M (Findings & Risk Scoring - Backend):**
+   - Create endpoints for `POST /v1/agent/:serverId/findings` and `/events`.
+   - Implement scoring logic to calculate Health and Security scores.
 
 ## Important Project Constraints
 - **Deployment:** Must be simple (PM2 + systemd/Windows Service). NO Docker or Kubernetes.

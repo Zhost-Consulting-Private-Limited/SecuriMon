@@ -63,11 +63,22 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Start Threat Detection loop in a background goroutine
+	go StartThreatDetection(config)
+
+	// Start WebSocket listener in a background goroutine
+	go ConnectWebSocket(config)
+
 	// Main execution loop (Heartbeat / Telemetry)
 	ticker := time.NewTicker(60 * time.Second)
+	scanTicker := time.NewTicker(1 * time.Hour) // Run security scan hourly
 	defer ticker.Stop()
+	defer scanTicker.Stop()
 
 	log.Println("Agent initialized and entering main loop...")
+
+	// Run initial security scan
+	go runAndPushScan(config)
 
 	for {
 		select {
@@ -85,10 +96,23 @@ func main() {
 			} else {
 				log.Println("Telemetry pushed successfully.")
 			}
+		case <-scanTicker.C:
+			go runAndPushScan(config)
 		case sig := <-sigChan:
 			log.Printf("Received signal: %v. Shutting down gracefully...", sig)
 			// TODO: Clean up resources, flush buffers
 			return
 		}
+	}
+}
+
+func runAndPushScan(config *Config) {
+	log.Println("Running scheduled security scan...")
+	findings := RunSecurityScan()
+	err := SendSecurityScan(config.BackendURL, config.ServerID, config.APIKey, findings)
+	if err != nil {
+		log.Printf("Failed to push security findings: %v", err)
+	} else {
+		log.Printf("Pushed %d security findings successfully.", len(findings))
 	}
 }

@@ -3,6 +3,7 @@ module github.com/Zhost-Consulting-Private-Limited/SecuriMon/agent
 go 1.25.5
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/nxadm/tail v1.4.11
 	github.com/shirou/gopsutil/v3 v3.24.5
 )

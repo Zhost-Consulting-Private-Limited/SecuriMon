@@ -2,9 +2,12 @@ import 'dotenv/config';
 import 'express-async-errors'; // Handles async errors in express routes
 import express from 'express';
 import cors from 'cors';
+import http from 'http';
 import authRoutes from './routes/auth';
 import agentRoutes from './routes/agent';
+import serverRoutes from './routes/server';
 import { startMetricsAggregator } from './jobs/metricsAggregator';
+import { setupWebSocket } from './ws';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -16,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/v1/auth', authRoutes);
 app.use('/v1/agent', agentRoutes);
+app.use('/v1/servers', serverRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -29,7 +33,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start Server & Background Jobs
-app.listen(PORT, () => {
+const server = http.createServer(app);
+setupWebSocket(server);
+
+server.listen(PORT, () => {
   console.log(`SecuriMon Core API & Ingestion running on http://localhost:${PORT}`);
   startMetricsAggregator();
 });

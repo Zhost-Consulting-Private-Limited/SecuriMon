@@ -13,19 +13,20 @@ This document tracks the current state of the project. Update this file at the e
 - [x] Handoff document created.
 - [x] Extended implementation plan with CI/CD, cross-platform agents (Windows/Linux), Razorpay, and Website spec (`WEBSITE_SPEC.md`).
 - [x] Extended implementation plan with Phase 10: Security, Agent OTA Updates, Data Retention, and GDPR compliance.
+- [x] Batch A: Project Initialization (Folders, Node.js `package.json`, Go module, GitHub actions folder).
+- [x] Public GitHub Repository created.
+- [x] Batch B: Database Schema & Prisma Setup (`schema.prisma` translated and SQLite configured).
+- [x] Batch C: Backend Authentication & Tenancy (Express, JWT, bcrypt, tenancy middleware).
+- [x] Batch D: Agent Skeleton & Installation Script (`main.go`, `config.go`, `install.sh`).
+- [x] Batch CC: GitHub workflow `build-agent.yml` implemented for cross-platform agent build (Linux/Windows) with 1-day artifact retention and Windows signing stub.
 
 ## What is Currently In Progress
-- Not yet started code implementation.
+- Ready to start Phase 2 (Telemetry & Ingestion).
 
 ## Next Work Startup (Action Items)
-1. **Start Batch A (Project Initialization):**
-   - Create `/backend`, `/frontend` (or `/website`), and `/agent` folders.
-   - Initialize `package.json` in `/backend` (Express or NestJS setup).
-   - Initialize `go.mod` in `/agent`.
-   - Setup GitHub Actions folder `.github/workflows`.
-2. **Start Batch B (Database):**
-   - Install Prisma in the backend.
-   - Translate the `DATABASE_SCHEMA.md` into `schema.prisma`.
+1. **Start Batch F (System & Hardware Discovery - Agent):**
+   - Implement OS, CPU, RAM, and Network interface detection in Go.
+   - Send inventory data to backend on startup.
 
 ## Important Project Constraints
 - **Deployment:** Must be simple (PM2 + systemd/Windows Service). NO Docker or Kubernetes.

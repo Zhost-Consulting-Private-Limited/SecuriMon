@@ -1,0 +1,75 @@
+name: Build and Sign SecuriMon Agent
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'agent/**'
+      - '.github/workflows/build-agent.yml'
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - 'agent/**'
+
+jobs:
+  build:
+    name: Build Agent
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            name: securimon-agent-linux-amd64
+          - os: linux
+            arch: arm64
+            name: securimon-agent-linux-arm64
+          - os: windows
+            arch: amd64
+            name: securimon-agent-windows-amd64.exe
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+        cache-dependency-path: agent/go.sum
+
+    - name: Ensure go.mod/go.sum are tidy
+      working-directory: ./agent
+      run: |
+        go mod tidy
+
+    - name: Compile Binary
+      working-directory: ./agent
+      env:
+        GOOS: ${{ matrix.os }}
+        GOARCH: ${{ matrix.arch }}
+      run: |
+        mkdir -p ../build
+        go build -ldflags="-s -w" -o ../build/${{ matrix.name }} .
+
+    # Windows requires code signing to avoid SmartScreen and AV warnings
+    # This uses a placeholder for an open-source cert signing process (like Azure SignTool or osslsigncode)
+    - name: Sign Windows Executable
+      if: matrix.os == 'windows'
+      run: |
+        echo "Signing Windows binary..."
+        echo "Note: In production, insert 'osslsigncode' or 'Azure SignTool' step here."
+        # Example using osslsigncode (requires cert in Secrets):
+        # sudo apt-get install -y osslsigncode
+        # osslsigncode sign -certs <(echo "${{ secrets.WINDOWS_CERT_BASE64 }}" | base64 -d) \
+        #   -key <(echo "${{ secrets.WINDOWS_CERT_KEY_BASE64 }}" | base64 -d) \
+        #   -pass "${{ secrets.WINDOWS_CERT_PASSWORD }}" \
+        #   -in ../build/${{ matrix.name }} -out ../build/${{ matrix.name }}-signed
+        # mv ../build/${{ matrix.name }}-signed ../build/${{ matrix.name }}
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}
+        path: build/${{ matrix.name }}
+        retention-days: 1  # As requested, store artifact for 1 day

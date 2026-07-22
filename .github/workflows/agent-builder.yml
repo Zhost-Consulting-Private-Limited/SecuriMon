@@ -41,24 +41,27 @@ jobs:
       - name: Determine Changed Files
         id: changes
         run: |
-          changed_files="$(git diff --name-only HEAD ${{ github.event.pull_request.head.sha || 'HEAD' }})${
-            if ${{ github.event_name == 'pull_request' }}; then
-              echo "Analyzing PR changes..."
-            else
-              echo "Analyzing push changes..."
-            fi
-          }
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Analyzing PR changes..."
+            changed_files=$(git diff --name-only HEAD ${{ github.event.pull_request.head.sha }})
+          else
+            echo "Analyzing push changes..."
+            changed_files=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$changed_files"
           
           agent_changes="false"
           backend_changes="false"
           frontend_changes="false"
           
           for file in $changed_files; do
-            if [[ $file == agent/* ]] || [[ $file == pkg.go ]]; then
+            if [[ $file == agent/* ]]; then
               agent_changes="true"
-            elif [[ $file == backend/* ]] || [[ $file == src/* ]]; then
+            elif [[ $file == backend/* ]]; then
               backend_changes="true"
-            elif [[ $file == frontend/* ]] || [[ $file == src/* ]]; then
+            elif [[ $file == frontend/* ]]; then
               frontend_changes="true"
             fi
           done

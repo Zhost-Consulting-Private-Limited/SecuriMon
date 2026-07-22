@@ -71,6 +71,10 @@ jobs:
               backend_changes="true"
             elif [[ $file == frontend/* ]]; then
               frontend_changes="true"
+            elif [[ $file == .github/* ]]; then
+              agent_changes="true"
+              backend_changes="true"
+              frontend_changes="true"
             fi
           done
           

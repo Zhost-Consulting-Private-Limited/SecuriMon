@@ -24,9 +24,9 @@ jobs:
   analyze-changes:
     runs-on: ubuntu-latest
     outputs:
-      agent: ${{ jobs.analyze-changes.outputs.agent }}
-      backend: ${{ jobs.analyze-changes.outputs.backend }}
-      frontend: ${{ jobs.analyze-changes.outputs.frontend }}
+      agent: ${{ steps.changes.outputs.agent_needs_build }}
+      backend: ${{ steps.changes.outputs.backend_needs_build }}
+      frontend: ${{ steps.changes.outputs.frontend_needs_build }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

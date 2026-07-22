@@ -112,26 +112,24 @@ jobs:
       - name: Install Musl Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev gcc-aarch64-linux-gnu gcc-x86-64-linux-gnu
+          sudo apt-get install -y musl-tools musl-dev
       
       - name: Create Build Directory
         run: |
           mkdir -p artifacts/linux/${{ matrix.arch }}
       
-      - name: Build Linux Musl Static Binary
+      - name: Build Linux Static Binary
         run: |
           cd agent
-          export CC=musl-gcc
-          export CXX=musl-g++
-          export CGO_ENABLED=1
           export GOOS=linux
           export GOARCH=${{ matrix.goarch }}
+          export CGO_ENABLED=0
           
           echo "Building Linux ${{ matrix.arch }} static binary..."
-          go build -trimpath -ldflags="-w -s -extldflags=-static" -o "../artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}"
+          go build -trimpath -ldflags="-w -s" -o "../artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}"
           
           echo "Checking binary type..."
-          file "../artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" | grep -E "static|shared" || echo "Checking..."
+          file "../artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" | grep -E "static|shared|ELF" || echo "Checking..."
       
       - name: Validate Binary
         run: |

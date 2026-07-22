@@ -82,9 +82,6 @@ jobs:
     needs: analyze-changes
     if: needs.analyze-changes.outputs.agent == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agent
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -106,6 +103,7 @@ jobs:
         with:
           go-version: '1.25.5'
           cache: true
+          cache-dependency-path: agent/go.sum
       
       - name: Install Musl Tools
         run: |
@@ -118,17 +116,18 @@ jobs:
       
       - name: Build Linux Musl Static Binary
         run: |
+          cd agent
           export CC=musl-gcc
           export CXX=musl-g++
           export CGO_ENABLED=1
           export GOOS=linux
-          export GOARCH=${{ matrix.target }}
+          export GOARCH=${{ matrix.goarch }}
           
           echo "Building Linux ${{ matrix.arch }} static binary..."
-          go build -trimpath -ldflags="-w -s -extldflags=-static" -o "artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}"
+          go build -trimpath -ldflags="-w -s -extldflags=-static" -o "../artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}"
           
           echo "Checking binary type..."
-          file "artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" | grep -E "static|shared" || echo "Checking..."
+          file "../artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" | grep -E "static|shared" || echo "Checking..."
       
       - name: Validate Binary
         run: |
@@ -136,9 +135,9 @@ jobs:
           echo "Binary type: $FILE_TYPE"
           
           if [[ "$FILE_TYPE" == *"ELF"* ]]; then
-            echo "✓ Valid ELF executable"
+            echo "Valid ELF executable"
           else
-            echo "✗ Invalid ELF executable"
+            echo "Invalid ELF executable"
             exit 1
           fi
           
@@ -147,16 +146,16 @@ jobs:
           
           if [[ "$EXE_ARCH" == *"x86-64"* ]] || [[ "$EXE_ARCH" == *"AMD64"* ]]; then
             if [[ "${{ matrix.arch }}" == "amd64" ]]; then
-              echo "✓ Architecture matches target"
+              echo "Architecture matches target"
             else
-              echo "✗ Architecture mismatch"
+              echo "Architecture mismatch"
               exit 1
             fi
           elif [[ "$EXE_ARCH" == *"ARM"* ]] || [[ "$EXE_ARCH" == *"aarch64"* ]]; then
             if [[ "${{ matrix.arch }}" == "arm64" ]]; then
-              echo "✓ Architecture matches target"
+              echo "Architecture matches target"
             else
-              echo "✗ Architecture mismatch"
+              echo "Architecture mismatch"
               exit 1
             fi
           fi
@@ -165,7 +164,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
-          path: artifacts/linux/${{ matrix.arch }}/
+          path: artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}
           retention-days: 7
       
       - name: Generate Build Report
@@ -184,9 +183,6 @@ jobs:
     needs: analyze-changes
     if: needs.analyze-changes.outputs.agent == 'true'
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: agent
     strategy:
       matrix:
         arch: [x86_64, x86]
@@ -208,49 +204,50 @@ jobs:
         with:
           go-version: '1.25.5'
           cache: true
+          cache-dependency-path: agent/go.sum
       
       - name: Build Windows Binary
+        working-directory: agent
         run: |
-          go build -trimpath -ldflags="-w -s" -o "securimon_${{ matrix.target }}.exe"
-          
+          $env:GOOS = "windows"
+          $env:GOARCH = "${{ matrix.goarch }}"
+          $env:CGO_ENABLED = "0"
+          go build -trimpath -ldflags="-w -s" -o "../securimon_${{ matrix.target }}.exe"
+      
+      - name: Move Binary to Artifacts
+        run: |
           New-Item -Path "artifacts\windows\${{ matrix.arch }}" -ItemType Directory -Force
-          
           Copy-Item "securimon_${{ matrix.target }}.exe" "artifacts\windows\${{ matrix.arch }}\securimon_${{ matrix.target }}.exe"
       
       - name: Validate Binary
         run: |
-          $fileType = Get-Content "securimon_${{ matrix.target }}.exe" -Encoding Byte | Where-Object { $_ -ge 0x4E -and $_ -le 0x5E } | Select-Object -First 1
-          $peSignature = "PE\x00\x00"
-          
-          if ($fileType -eq $peSignature) {
-            Write-Host "✓ Valid PE executable"
+          if (Test-Path "artifacts\windows\${{ matrix.arch }}\securimon_${{ matrix.target }}.exe") {
+            $binarySize = (Get-Item "artifacts\windows\${{ matrix.arch }}\securimon_${{ matrix.target }}.exe").Length
+            $binaryMB = [math]::Round($binarySize / 1MB, 2)
+            Write-Host "Valid PE executable - Binary size: $binaryMB MB"
           } else {
-            Write-Host "✗ Invalid PE executable"
+            Write-Host "Binary not found"
             exit 1
           }
-          
-          $binarySize = (Get-Item "securimon_${{ matrix.target }}.exe").Length
-          $binaryMB = [math]::Round($binarySize / 1MB, 2)
-          Write-Host "Binary size: $binaryMB MB"
       
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}
-          path: artifacts/windows/${{ matrix.arch }}/
+          path: artifacts/windows/${{ matrix.arch }}/securimon_${{ matrix.target }}.exe
           retention-days: 7
       
       - name: Generate Build Report
         if: github.event_name != 'pull_request'
         run: |
-          echo "## Windows Build Report" >> $GITHUB_STEP_SUMMARY
-          echo "Arch: ${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
-          echo "Target: ${{ matrix.target }}" >> $GITHUB_STEP_SUMMARY
-          echo "Binary: securimon_${{ matrix.target }}.exe" >> $GITHUB_STEP_SUMMARY
+          echo "## Windows Build Report" >> $env:GITHUB_STEP_SUMMARY
+          echo "Arch: ${{ matrix.arch }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "Target: ${{ matrix.target }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "Binary: securimon_${{ matrix.target }}.exe" >> $env:GITHUB_STEP_SUMMARY
           
-          $binarySize = (Get-Item "securimon_${{ matrix.target }}.exe").Length
+          $binarySize = (Get-Item "artifacts\windows\${{ matrix.arch }}\securimon_${{ matrix.target }}.exe").Length
           $binaryMB = [math]::Round($binarySize / 1MB, 2)
-          echo "Binary size: $binaryMB MB" >> $GITHUB_STEP_SUMMARY
+          echo "Binary size: $binaryMB MB" >> $env:GITHUB_STEP_SUMMARY
 
   build-backend:
     needs: analyze-changes

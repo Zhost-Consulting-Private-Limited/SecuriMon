@@ -113,9 +113,8 @@ jobs:
           echo "Building Linux ${{ matrix.arch }} static binary..."
           go build -trimpath -ldflags="-w -s -extldflags=-static" -o "artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}"
           
-          file "artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" << EOF
-$(file "artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" | grep -E "static|shared" || echo "Checking...")
-EOF
+          echo "Checking binary type..."
+          file "artifacts/linux/${{ matrix.arch }}/securimon_${{ matrix.target }}" | grep -E "static|shared" || echo "Checking..."
       
       - name: Validate Binary
         run: |
@@ -291,7 +290,6 @@ EOF
     if: needs.analyze-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
-      have to handle the bash execution in GitHub Actions properly
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -376,8 +374,8 @@ EOF
           npm install
           npm run test:integration
       
-      - name essentially:
-        echo "Integration tests completed"
+      - name: Integration Test Complete
+        run: echo "Integration tests completed"
 
   generate-manifest:
     needs: [build-backend, build-frontend]
@@ -394,7 +392,7 @@ EOF
         run: |
           cat > manifest.json << EOF
           {
-            "build_id": "${{ github.run_id }}-${ github.run_number }}",
+            "build_id": "${{ github.run_id }}-${{ github.run_number }}",
             "version": "$(git describe --tags --always --dirty 2>/dev/null || echo 'v0.0.0')",
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "git_commit": "${{ github.sha }}",
@@ -420,85 +418,6 @@ EOF
     runs-on: ubuntu-latest
     steps:
       - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: '*/**'
-          path: downloaded-artifacts
-          merge-multiple: true
-      
-      - name: Check for Required Files
-        run: |
-          echo "=== Checking Required Files ==="
-          
-          if [ -f "downloaded-artifacts/backend/index.html" ]; then
-            echo "✓ Backend index.html found"
-          else
-            echo "✗ Backend index.html not found"
-            exit 1
-          fi
-          
-          if [ -f "downloaded-artifacts/frontend/index.html" ]; then
-            echo "✓ Frontend index.html found"
-          else
-            echo "✗ Frontend index.html not found"
-            exit 1
-          fi
-      
-      - name: Validate Distribution
-        run: |
-          echo "=== Distributing Artifacts ==="
-          echo "Checking artifact counts..."
-          
-          BACKEND_COUNT=$(find downloaded-artifacts -path "*/backend/*" -type f 2>/dev/null | wc -l)
-          FRONTEND_COUNT=$(find downloaded-artifacts -path "*/frontend/*" -type f 2>/dev/null | wc -l)
-          
-          echo "Backend artifacts: $BACKEND_COUNT"
-          echo "Frontend artifacts: $FRONTEND_COUNT"
-          echo "Total artifacts: $((BACKEND_COUNT + FRONTEND_COUNT))"
-          
-          if [ $BACKEND_COUNT -gt 0 ] && [ $FRONTEND_COUNT -gt 0 ]; then
-            echo "✓ All artifacts distributed correctly"
-          else
-            echo "✗ Artifact distribution incomplete"
-            exit 1
-          fi
-
-  summary:
-    needs: [validate-builds, generate-manifest]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: '*/**'
-          path: downloaded-artifacts
-          merge-multiple: true
-      
-      - name: Generate Comprehensive Summary
-        run: |
-          echo "## 🛠️ Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
-          echo "- Build ID: ${{ github.run_id }}-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Git Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Git Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifact Distribution" >> $GITHUB_STEP_SUMMARY
-          
-          BACKEND_FILES=$(find downloaded-artifacts -path "*/backend/*" -type f 2>/dev/null | wc -l)
-          FRONTEND_FILES=$(find downloaded-artifacts -path "*/frontend/*" -type f 2>/dev/null | wc -l)
-          LINUX_FILES=$(find downloaded-artifacts -name "linux-*" -type f 2>/dev/null | wc -l)
-          WINDOWS_FILES=$(find downloaded-artifacts -name "windows-*" -type f 2>/dev/null | wc -l)
-          
-          echo "- Backend artifacts: $BACKEND_FILES" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend artifacts: $FRONTEND_FILES" >> $GITHUB_STEP_SUMMARY
-
-  validate-builds:
-    needs: [build-backend, build-frontend]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: '*/**'

@@ -28,8 +28,8 @@ func ConnectWebSocket(config *Config) {
 	// Reconnection loop
 	for {
 		wsURLStr := strings.Replace(config.BackendURL, "http", "ws", 1) + "/v1/agent/stream?apiKey=" + url.QueryEscape(config.APIKey)
+		log.Printf("Attempting to connect WebSocket to backend: %s", wsURLStr)
 
-		log.Printf("Attempting to connect WebSocket to backend...")
 		c, _, err := websocket.DefaultDialer.Dial(wsURLStr, nil)
 		if err != nil {
 			log.Printf("WebSocket connection failed: %v. Retrying in 10s...", err)

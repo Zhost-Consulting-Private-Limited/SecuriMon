@@ -238,4 +238,42 @@ router.post('/:serverId/findings', authenticateAgent, async (req: AgentRequest, 
   }
 });
 
+// Batch U: Application Services Ingestion
+router.post('/:serverId/applications', authenticateAgent, async (req: AgentRequest, res: Response) => {
+  const serverId = req.server.id;
+  const services = req.body;
+
+  if (!services || !Array.isArray(services)) {
+    return res.status(400).json({ error: 'services array is required' });
+  }
+
+  try {
+    // Save each service with additional metadata
+    const savedServices = await Promise.all(
+      services.map((service) =>
+        prisma.applicationService.create({
+          data: {
+            serverId,
+            name: service.name,
+            status: service.status || 'unknown',
+            pid: service.pid || null,
+            cpu: service.cpu || null,
+            memory: service.memory || null,
+            restartCount: service.restartCount || 0,
+            command: service.command || null,
+            startTime: service.startTime ? new Date(service.startTime) : null,
+            metadata: service.metadata || null,
+            discoveredAt: new Date(),
+          }
+        })
+      )
+    );
+
+    res.status(202).json({ message: 'Application services recorded', count: savedServices.length });
+  } catch (error: any) {
+    console.error('Error saving application services:', error);
+    res.status(500).json({ error: 'Failed to process application services' });
+  }
+});
+
 export default router;

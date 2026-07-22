@@ -6,6 +6,7 @@ import http from 'http';
 import authRoutes from './routes/auth';
 import agentRoutes from './routes/agent';
 import serverRoutes from './routes/server';
+import aiRoutes from './routes/ai';
 import { startMetricsAggregator } from './jobs/metricsAggregator';
 import { setupWebSocket } from './ws';
 
@@ -20,6 +21,8 @@ app.use(express.json());
 app.use('/v1/auth', authRoutes);
 app.use('/v1/agent', agentRoutes);
 app.use('/v1/servers', serverRoutes);
+app.use('/v1/ai', aiRoutes);
+app.use('/v1/logs', aiRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

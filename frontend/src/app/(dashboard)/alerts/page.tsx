@@ -137,7 +137,10 @@ export default function AlertsPage() {
             </button>
             <p className="text-xs text-gray-500 mt-2">
               Channel format: <code>email:you@example.com</code>, <code>slack:https://hooks.slack.com/...</code>,{" "}
-              <code>discord:https://discord.com/api/webhooks/...</code>, or <code>webhook:https://your-url</code>
+              <code>discord:https://discord.com/api/webhooks/...</code>,{" "}
+              <code>teams:https://outlook.office.com/webhook/...</code>, <code>telegram:&lt;chat_id&gt;</code> (needs{" "}
+              <code>TELEGRAM_BOT_TOKEN</code> configured), <code>sms:+15551234567</code> (needs Twilio configured),
+              or <code>webhook:https://your-url</code>
             </p>
           </div>
         </form>

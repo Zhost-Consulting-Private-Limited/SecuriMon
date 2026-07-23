@@ -39,3 +39,6 @@ Thumbs.db
 dist/
 build/
 coverage/
+
+# Generated compliance PDF reports
+backend/reports/

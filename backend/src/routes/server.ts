@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { authenticate, AuthRequest } from '../middlewares/auth';
 import { prisma } from '../utils/prisma';
 import { sendCommandToAgent } from '../ws';
+import { generateCisReport, reportFilePath } from '../services/compliance/report';
 
 const router = Router();
 
@@ -68,14 +69,70 @@ router.post('/install-token', authenticate, async (req: AuthRequest, res: Respon
   res.status(201).json({ token, expiresIn: '24h', installCommand });
 });
 
-// Dashboard Route to get servers, with each server's latest score attached
+const GROUP_BY_FIELDS: Record<string, 'environment' | 'project' | 'region' | 'customerLabel'> = {
+  environment: 'environment',
+  project: 'project',
+  region: 'region',
+  customer: 'customerLabel',
+};
+
+// Dashboard Route to get servers, with each server's latest score attached. Optionally
+// grouped via ?group_by=environment|project|region|customer|tag, each group carrying a
+// health rollup (FR-18xx: Multi-Server Dashboard).
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   const tenantId = req.user?.tenantId;
   const servers = await prisma.server.findMany({
     where: { tenantId },
     select: { ...SERVER_PUBLIC_SELECT, scores: { orderBy: { scoredAt: 'desc' }, take: 1 } },
   });
-  res.json(servers.map(({ scores, ...s }) => ({ ...s, latestScore: scores[0] ?? null })));
+  const flattened = servers.map(({ scores, ...s }) => ({ ...s, latestScore: scores[0] ?? null }));
+
+  const groupBy = typeof req.query.group_by === 'string' ? req.query.group_by : undefined;
+  if (!groupBy) {
+    return res.json(flattened);
+  }
+
+  const buckets = new Map<string, typeof flattened>();
+  const addToBucket = (key: string, server: (typeof flattened)[number]) => {
+    const existing = buckets.get(key);
+    if (existing) existing.push(server);
+    else buckets.set(key, [server]);
+  };
+
+  if (groupBy === 'tag') {
+    for (const server of flattened) {
+      let tags: string[] = [];
+      try {
+        tags = server.tags ? JSON.parse(server.tags) : [];
+      } catch {
+        tags = [];
+      }
+      if (tags.length === 0) addToBucket('Untagged', server);
+      else tags.forEach((tag) => addToBucket(tag, server));
+    }
+  } else if (GROUP_BY_FIELDS[groupBy]) {
+    const field = GROUP_BY_FIELDS[groupBy];
+    for (const server of flattened) {
+      addToBucket((server as any)[field] || 'Ungrouped', server);
+    }
+  } else {
+    return res.status(400).json({ error: 'group_by must be one of: environment, project, region, customer, tag' });
+  }
+
+  const groups = Array.from(buckets.entries()).map(([key, groupServers]) => {
+    const online = groupServers.filter((s) => s.status === 'online').length;
+    const scored = groupServers.filter((s) => s.latestScore?.overallScore != null);
+    const avgOverallScore = scored.length
+      ? Math.round(scored.reduce((sum, s) => sum + (s.latestScore!.overallScore ?? 0), 0) / scored.length)
+      : null;
+    return {
+      key,
+      rollup: { total: groupServers.length, online, offline: groupServers.length - online, avgOverallScore },
+      servers: groupServers,
+    };
+  });
+
+  res.json({ groupBy, groups });
 });
 
 // Server detail: overview + latest score
@@ -251,6 +308,89 @@ router.post('/:serverId/findings/:findingId/fix', authenticate, async (req: Auth
   } catch (error: any) {
     res.status(503).json({ error: error.message });
   }
+});
+
+// Generate a CIS-mapped compliance PDF from the server's current findings (FR-15xx v1:
+// CIS only, partial control coverage - see services/compliance/report.ts).
+router.post('/:serverId/compliance/report', authenticate, async (req: AuthRequest, res: Response) => {
+  const server = await loadOwnedServer(req, res);
+  if (!server) return;
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.user!.tenantId } });
+  const fullServer = await prisma.server.findUnique({ where: { id: server.id }, select: { hostname: true } });
+
+  // Most recent finding per rule, so a fixed issue doesn't still show as FAIL.
+  const allFindings = await prisma.securityFinding.findMany({
+    where: { serverId: server.id },
+    orderBy: { detectedAt: 'desc' },
+  });
+  const latestByRule = new Map<string, (typeof allFindings)[number]>();
+  for (const f of allFindings) {
+    if (!latestByRule.has(f.ruleId)) latestByRule.set(f.ruleId, f);
+  }
+  const findings = Array.from(latestByRule.values());
+
+  const reportId = crypto.randomUUID();
+  const generatedAt = new Date();
+
+  try {
+    const { score } = await generateCisReport({
+      reportId,
+      hostname: fullServer?.hostname ?? server.id,
+      tenantName: tenant?.name ?? 'Unknown Tenant',
+      generatedAt,
+      findings: findings.map((f) => ({
+        ruleId: f.ruleId,
+        category: f.category,
+        severity: f.severity,
+        passed: f.passed,
+        detectedAt: f.detectedAt,
+      })),
+    });
+
+    const report = await prisma.complianceReport.create({
+      data: {
+        id: reportId,
+        tenantId: req.user!.tenantId,
+        serverId: server.id,
+        framework: 'cis',
+        score,
+        pdfUrl: `/v1/servers/${server.id}/compliance/reports/${reportId}/download`,
+        generatedAt,
+      },
+    });
+
+    res.status(201).json(report);
+  } catch (error: any) {
+    console.error('Failed to generate compliance report:', error);
+    res.status(500).json({ error: 'Failed to generate compliance report' });
+  }
+});
+
+// List past compliance reports for this server
+router.get('/:serverId/compliance', authenticate, async (req: AuthRequest, res: Response) => {
+  const server = await loadOwnedServer(req, res);
+  if (!server) return;
+
+  const reports = await prisma.complianceReport.findMany({
+    where: { serverId: server.id },
+    orderBy: { generatedAt: 'desc' },
+  });
+  res.json(reports);
+});
+
+// Download a previously generated compliance PDF
+router.get('/:serverId/compliance/reports/:reportId/download', authenticate, async (req: AuthRequest, res: Response) => {
+  const server = await loadOwnedServer(req, res);
+  if (!server) return;
+
+  const reportId = typeof req.params.reportId === 'string' ? req.params.reportId : undefined;
+  if (!reportId) return res.status(400).json({ error: 'reportId is required' });
+
+  const report = await prisma.complianceReport.findFirst({ where: { id: reportId, serverId: server.id } });
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+
+  res.download(reportFilePath(reportId), `vigilon-compliance-${server.id}-${reportId}.pdf`);
 });
 
 export default router;

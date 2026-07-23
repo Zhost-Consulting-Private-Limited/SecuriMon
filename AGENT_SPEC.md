@@ -1,10 +1,10 @@
-# SecuriMon — Agent Technical Specification
+# Vigilon — Agent Technical Specification
 
 ## 1. Overview
 The Agent is a single lightweight binary installed on each monitored Linux server. It is the sole component with local visibility into the host and is responsible for collection, detection, enforcement, and (optionally) remediation.
 
 **Language:** Rust (preferred) or Go
-**Distribution:** Static binary, installed as a `systemd` service (`securimon-agent.service`)
+**Distribution:** Static binary, installed as a `systemd` service (`vigilon-agent.service`)
 **Resource budget:** < 40 MB resident memory, < 1% average CPU
 **Local storage:** SQLite (buffering, local cache, offline resilience)
 
@@ -13,9 +13,9 @@ The Agent is a single lightweight binary installed on each monitored Linux serve
 2. Install script:
    - Detects OS/distro/arch.
    - Downloads the correct static binary.
-   - Installs binary to `/usr/local/bin/securimon-agent`.
+   - Installs binary to `/usr/local/bin/vigilon-agent`.
    - Creates systemd unit and enables/starts the service.
-   - Registers the server with the backend using the install token, receiving a per-server API key in return, stored at `/etc/securimon/agent.conf` (mode `0600`, root-owned).
+   - Registers the server with the backend using the install token, receiving a per-server API key in return, stored at `/etc/vigilon/agent.conf` (mode `0600`, root-owned).
 3. Agent performs initial discovery scan and reports inventory within the first check-in cycle.
 4. Total elapsed time target: **< 2 minutes**.
 
@@ -76,7 +76,7 @@ The Agent is a single lightweight binary installed on each monitored Linux serve
 - All payloads TLS 1.2+ encrypted; message integrity verified.
 
 ## 5. Configuration
-Local config file: `/etc/securimon/agent.conf`
+Local config file: `/etc/vigilon/agent.conf`
 ```
 tenant_id = "..."
 server_id = "..."

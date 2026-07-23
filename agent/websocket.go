@@ -53,6 +53,24 @@ func ConnectWebSocket(config *Config) {
 				continue
 			}
 
+			// "rescan" isn't a remediation action - it triggers an on-demand discovery/
+			// security scan and pushes results the same way the hourly scheduled scan does.
+			if cmd.Action == "rescan" {
+				go runAndPushScan(config)
+				go runAndPushApplications(config)
+				res := RemediationResult{
+					Type:      "remediation_result",
+					CommandID: cmd.CommandID,
+					Action:    cmd.Action,
+					Status:    "success",
+					Detail:    "rescan triggered",
+				}
+				if err := c.WriteJSON(res); err != nil {
+					log.Printf("Failed to send rescan acknowledgement: %v", err)
+				}
+				continue
+			}
+
 			// Execute the command locally
 			resultStr, execErr := ExecuteRemediation(cmd.Action, cmd.Params)
 

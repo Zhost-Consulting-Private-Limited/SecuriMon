@@ -1,4 +1,4 @@
-name: Build and Sign SecuriMon Agent
+name: Build and Sign Vigilon Agent
 
 on:
   push:
@@ -20,13 +20,13 @@ jobs:
         include:
           - os: linux
             arch: amd64
-            name: securimon-agent-linux-amd64
+            name: vigilon-agent-linux-amd64
           - os: linux
             arch: arm64
-            name: securimon-agent-linux-arm64
+            name: vigilon-agent-linux-arm64
           - os: windows
             arch: amd64
-            name: securimon-agent-windows-amd64.exe
+            name: vigilon-agent-windows-amd64.exe
 
     steps:
     - name: Checkout Code
@@ -35,7 +35,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.21'
+        go-version: '1.25.5'
         cache-dependency-path: agent/go.sum
 
     - name: Ensure go.mod/go.sum are tidy

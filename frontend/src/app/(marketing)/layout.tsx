@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SecuriMon - Autonomous Server Operations",
+  title: "Vigilon - Enterprise Server Security, Monitoring & Audit Platform",
   description: "Secure. Monitor. Optimize. Without Hiring a DevOps Team.",
 };
 
@@ -25,7 +25,7 @@ export default function MarketingLayout({
   children: ReactNode;
 }>) {
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-zinc-50 dark:bg-black font-sans`}>
+    <div className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-white font-sans`}>
       {children}
     </div>
   );

@@ -9,7 +9,9 @@ import (
 )
 
 func RunSecurityScan() []SecurityFinding {
-	var findings []SecurityFinding
+	// Always a non-nil slice: encodes as JSON [] rather than null when empty, which
+	// the backend's findings-ingestion endpoint requires (see routes/agent.ts).
+	findings := []SecurityFinding{}
 
 	// Skip Linux-specific checks if running on Windows
 	if runtime.GOOS == "windows" {

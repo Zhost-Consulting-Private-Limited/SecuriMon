@@ -1,6 +1,6 @@
-# Contributing to SecuriMon
+# Contributing to Vigilon
 
-First off, thank you for considering contributing to SecuriMon! It's people like you that make SecuriMon such a great tool for securing and managing servers.
+First off, thank you for considering contributing to Vigilon! It's people like you that make Vigilon such a great tool for securing and managing servers.
 
 ## Where do I go from here?
 
@@ -8,7 +8,7 @@ If you've noticed a bug or have a feature request, make sure to check our [Issue
 
 ## Development Setup
 
-SecuriMon is a multi-component platform consisting of:
+Vigilon is a multi-component platform consisting of:
 - **Agent:** Go (Golang)
 - **Backend:** Node.js (Prisma, Express/NestJS)
 - **Frontend:** Next.js, Tailwind CSS
@@ -20,7 +20,7 @@ SecuriMon is a multi-component platform consisting of:
 
 ### Fork & Clone
 1. Fork the repo to your own GitHub account.
-2. Clone it to your local machine: `git clone https://github.com/YOUR-USERNAME/securimon.git`
+2. Clone it to your local machine: `git clone https://github.com/YOUR-USERNAME/vigilon.git`
 3. Refer to the specific sub-folder `README.md` files (in `/backend`, `/frontend`, and `/agent`) for instructions on how to run them locally.
 
 ## Pull Request Process

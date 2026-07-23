@@ -1,4 +1,4 @@
-# SecuriMon — Database Schema (PostgreSQL)
+# Vigilon — Database Schema (PostgreSQL)
 
 This document defines the core relational data model. Time-series metrics are assumed to live in a TimescaleDB hypertable (or equivalent) but are shown here in simplified relational form for clarity. All tables include `created_at`/`updated_at` timestamps (omitted below for brevity unless noted).
 

@@ -27,6 +27,9 @@ agent/obj/
 .DS_Store
 Thumbs.db
 
+# Claude Code local session artifacts (scratch worktrees, not project config)
+.claude/worktrees/
+
 # Databases
 *.db
 *.sqlite

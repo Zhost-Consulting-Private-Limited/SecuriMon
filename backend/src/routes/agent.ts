@@ -248,23 +248,38 @@ router.post('/:serverId/applications', authenticateAgent, async (req: AgentReque
   }
 
   try {
-    // Save each service with additional metadata
+    // Upsert each service into the real Application model (keyed on serverId+name),
+    // since this endpoint is called repeatedly as application state changes.
     const savedServices = await Promise.all(
       services.map((service) =>
-        prisma.applicationService.create({
-          data: {
+        prisma.application.upsert({
+          where: { serverId_name: { serverId, name: service.name } },
+          update: {
+            managerType: service.manager_type || service.managerType || 'unknown',
+            port: service.port ?? null,
+            version: service.version ?? null,
+            status: service.status || 'unknown',
+            restartCount24h: service.restart_count ?? service.restartCount ?? 0,
+            lastRestartAt: service.last_restart_at
+              ? new Date(service.last_restart_at)
+              : service.startTime
+              ? new Date(service.startTime)
+              : null,
+          },
+          create: {
             serverId,
             name: service.name,
+            managerType: service.manager_type || service.managerType || 'unknown',
+            port: service.port ?? null,
+            version: service.version ?? null,
             status: service.status || 'unknown',
-            pid: service.pid || null,
-            cpu: service.cpu || null,
-            memory: service.memory || null,
-            restartCount: service.restartCount || 0,
-            command: service.command || null,
-            startTime: service.startTime ? new Date(service.startTime) : null,
-            metadata: service.metadata || null,
-            discoveredAt: new Date(),
-          }
+            restartCount24h: service.restart_count ?? service.restartCount ?? 0,
+            lastRestartAt: service.last_restart_at
+              ? new Date(service.last_restart_at)
+              : service.startTime
+              ? new Date(service.startTime)
+              : null,
+          },
         })
       )
     );

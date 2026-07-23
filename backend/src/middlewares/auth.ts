@@ -9,7 +9,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'securimon-super-secret-key-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET || 'vigilon-super-secret-key-change-in-prod';
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;

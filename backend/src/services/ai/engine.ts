@@ -59,7 +59,7 @@ export interface AIResponse {
   citations: Citation[];
 }
 
-const SYSTEM_PROMPT = `You are SecuriMon AI Assistant, an expert system administrator and security analyst.
+const SYSTEM_PROMPT = `You are Vigilon AI Assistant, an expert system administrator and security analyst.
 You analyze server metrics, security findings, and threat data to provide actionable insights.
 Always provide specific, prioritized recommendations with clear action steps.
 Format your response with clear sections and bullet points for readability.`;
@@ -124,7 +124,7 @@ function parseAIResponse(response: string): AIResponse {
   }
 
   if (citations.length === 0) {
-    citations.push({ type: 'AI Analysis', title: 'SecuriMon AI Assistant', date: new Date().toISOString().split('T')[0] });
+    citations.push({ type: 'AI Analysis', title: 'Vigilon AI Assistant', date: new Date().toISOString().split('T')[0] });
   }
 
   return { answer: response, citations };

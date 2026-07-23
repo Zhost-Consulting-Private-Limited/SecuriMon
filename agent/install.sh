@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-# SecuriMon Agent - 1-Click Installation Script for Linux
+# Vigilon Agent - 1-Click Installation Script for Linux
 
 echo "========================================="
-echo "   SecuriMon Agent Installer             "
+echo "   Vigilon Agent Installer             "
 echo "========================================="
 
 if [ "$EUID" -ne 0 ]; then
@@ -14,11 +14,11 @@ fi
 
 if [ -z "$INSTALL_TOKEN" ]; then
   echo "[ERROR] INSTALL_TOKEN environment variable is required."
-  echo "Usage: curl -sSL https://install.securimon.com | INSTALL_TOKEN=xxx bash"
+  echo "Usage: curl -sSL https://your-backend/install.sh | INSTALL_TOKEN=xxx BACKEND_URL=https://your-backend bash"
   exit 1
 fi
 
-BACKEND_URL=${BACKEND_URL:-"https://api.securimon.com"}
+BACKEND_URL=${BACKEND_URL:-"https://vigilon.bithost.in"}
 ARCH=$(uname -m)
 
 if [ "$ARCH" = "x86_64" ]; then
@@ -30,36 +30,57 @@ else
   exit 1
 fi
 
-echo "[1/4] Downloading agent binary for $BIN_ARCH..."
-# In production, download from actual release artifacts
-# curl -sSL "$BACKEND_URL/downloads/agent/linux/$BIN_ARCH/securimon-agent" -o /usr/local/bin/securimon-agent
-touch /usr/local/bin/securimon-agent # Placeholder
-chmod +x /usr/local/bin/securimon-agent
+echo "[1/4] Installing agent binary for $BIN_ARCH..."
+# This week's build does not yet host versioned release binaries for download here.
+# Self-hosted operators should build the agent from source (agent/) or take a binary
+# produced by .github/workflows/agent-builder.yml and place it at the path below.
+if [ ! -f /usr/local/bin/vigilon-agent ]; then
+  echo "[WARN] /usr/local/bin/vigilon-agent not found - build it from the agent/ source"
+  echo "       (go build -o /usr/local/bin/vigilon-agent ./agent) and re-run this script,"
+  echo "       or copy a CI-built binary there before continuing."
+  exit 1
+fi
+chmod +x /usr/local/bin/vigilon-agent
 
 echo "[2/4] Registering agent with backend..."
-# In production, we curl the backend /v1/agent/register to get credentials
-# Response would give server_id and api_key
-mkdir -p /etc/securimon
+HOSTNAME_VAL=$(hostname)
+OS_ID=$(. /etc/os-release 2>/dev/null && echo "$ID" || echo "linux")
+OS_VERSION=$(. /etc/os-release 2>/dev/null && echo "$VERSION_ID" || echo "")
+KERNEL_VERSION=$(uname -r)
 
-cat <<EOF > /etc/securimon/agent.conf
+REGISTER_RESPONSE=$(curl -sSf -X POST "$BACKEND_URL/v1/agent/register" \
+  -H "Content-Type: application/json" \
+  -d "{\"install_token\":\"$INSTALL_TOKEN\",\"hostname\":\"$HOSTNAME_VAL\",\"os\":\"$OS_ID\",\"os_version\":\"$OS_VERSION\",\"kernel_version\":\"$KERNEL_VERSION\"}")
+
+SERVER_ID=$(echo "$REGISTER_RESPONSE" | grep -o '"server_id"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -E 's/.*"([^"]*)"$/\1/')
+API_KEY=$(echo "$REGISTER_RESPONSE" | grep -o '"api_key"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -E 's/.*"([^"]*)"$/\1/')
+TENANT_ID=$(echo "$REGISTER_RESPONSE" | grep -o '"tenant_id"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -E 's/.*"([^"]*)"$/\1/')
+
+if [ -z "$SERVER_ID" ] || [ -z "$API_KEY" ]; then
+  echo "[ERROR] Registration failed. Backend response: $REGISTER_RESPONSE"
+  exit 1
+fi
+
+mkdir -p /etc/vigilon
+cat <<EOF > /etc/vigilon/agent.conf
 {
-  "tenant_id": "placeholder_tenant",
-  "server_id": "placeholder_server",
-  "api_key": "placeholder_key",
+  "tenant_id": "$TENANT_ID",
+  "server_id": "$SERVER_ID",
+  "api_key": "$API_KEY",
   "backend_url": "$BACKEND_URL"
 }
 EOF
-chmod 600 /etc/securimon/agent.conf
+chmod 600 /etc/vigilon/agent.conf
 
 echo "[3/4] Creating systemd service..."
-cat <<EOF > /etc/systemd/system/securimon-agent.service
+cat <<EOF > /etc/systemd/system/vigilon-agent.service
 [Unit]
-Description=SecuriMon Telemetry and Security Agent
+Description=Vigilon Telemetry and Security Agent
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/securimon-agent
+ExecStart=/usr/local/bin/vigilon-agent
 Restart=always
 RestartSec=10
 User=root
@@ -71,10 +92,10 @@ EOF
 
 echo "[4/4] Starting service..."
 systemctl daemon-reload
-systemctl enable securimon-agent
-# systemctl start securimon-agent # Disabled for local testing
+systemctl enable vigilon-agent
+systemctl restart vigilon-agent
 
 echo "========================================="
-echo " [SUCCESS] SecuriMon Agent is installed! "
-echo " Check status with: systemctl status securimon-agent"
+echo " [SUCCESS] Vigilon Agent is installed! "
+echo " Check status with: systemctl status vigilon-agent"
 echo "========================================="

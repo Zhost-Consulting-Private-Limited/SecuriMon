@@ -1,12 +1,12 @@
-# SecuriMon — API Specification
+# Vigilon — API Specification
 
 ## 1. Overview
 This document defines the REST and WebSocket API contract between:
 - Agent ↔ Backend (ingestion, config, remediation commands)
 - Dashboard ↔ Backend (Core API)
 
-Base URL (example): `https://api.securimon.io/v1`
-Ingestion URL (example): `https://ingest.securimon.io/v1`
+Base URL (example): `https://vigilon.bithost.in/v1`
+Ingestion URL (example): `https://vigilon.bithost.in/v1`
 
 All endpoints use JSON request/response bodies unless noted. All timestamps are ISO 8601 UTC.
 
@@ -166,8 +166,8 @@ Agent reports outcome of an executed remediation command.
 
 | Channel | Direction | Purpose |
 |---|---|---|
-| `wss://ingest.securimon.io/v1/agent/{server_id}/stream` | Agent ↔ Backend | Real-time event push, remediation command delivery |
-| `wss://api.securimon.io/v1/dashboard/{tenant_id}/stream` | Dashboard ↔ Backend | Live metric updates, live alert push, live timeline updates |
+| `wss://vigilon.bithost.in/v1/agent/{server_id}/stream` | Agent ↔ Backend | Real-time event push, remediation command delivery |
+| `wss://vigilon.bithost.in/v1/dashboard/{tenant_id}/stream` | Dashboard ↔ Backend | Live metric updates, live alert push, live timeline updates |
 
 Remediation command payload (Backend → Agent):
 ```json

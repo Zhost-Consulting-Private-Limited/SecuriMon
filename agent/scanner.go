@@ -153,5 +153,9 @@ func RunSecurityScan() []SecurityFinding {
 		Detail:             worldWritableDetail,
 	})
 
+	// 4. Scan for exposed credentials in common config/app directories (Phase 3
+	// Secrets Scanner). See secrets.go - never includes the actual matched value.
+	findings = append(findings, RunSecretsScan()...)
+
 	return findings
 }

@@ -70,14 +70,17 @@ Working overnight (2026-07-24) through Phase 3 items that don't need cloud/clust
 - ✅ Suspicious cron/binary changes (part of FR-5xx) / Configuration Drift Detection — new `agent/drift.go`, Linux-only: baseline-hash diffing of cron files/entries and 5 high-value system binaries, stored locally, first-run establishes baseline (no alert flood on install). **Not run on an actual Linux host this session** — verified by `go build`/`go vet` + code review only.
 - ❌ Port scan detection (also part of FR-5xx's original Phase 1 promise) — still not implemented. Needs connection-tracking, not just process listing; a heavier lift, not attempted in Batch A.
 
+## Phase 3 Batch B (complete — see `handoff.md` for exact verification level)
+
+- ✅ Secrets Scanner (detect exposed credentials/keys in configs) — new `agent/secrets.go`: bounded regex scan for AWS access keys, PEM private-key blocks, and hardcoded password/secret assignments across `.env`/`.yml`/`.yaml`/`.conf`/`.json` files under `/etc`, `/opt`, `/var/www`. Reports via the existing findings pipeline; never transmits the matched secret value itself. **Verified with the repo's first automated test suite** (`agent/secrets_test.go`, 6 passing tests exercising the detection logic directly against planted fixtures) plus a real API round-trip through the findings/risk-scoring pipeline.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
 - Self-Healing Infrastructure (broader automated recovery playbooks)
 - Patch Management (scheduled, tested OS/package patching)
-- Secrets Scanner (detect exposed credentials/keys in configs, repos, env files)
-- File Integrity Monitoring (FIM)
+- File Integrity Monitoring (FIM) — beyond the binary/cron baseline already covered by Batch A's drift detection
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
-- Malware Detection (signature + behavioral) — crypto-miner detection above is a first slice of this
+- Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
 
 ## Phase 4

@@ -1,8 +1,7 @@
 # Vigilon — Build Roadmap
 
-## This Week's Build (Restructure Sprint)
+## Restructure Sprint (complete, merged PR #1)
 
-This is the current, accurate status replacing the stale batch-tracking in the old `handoff.md`. Shipping this week:
 - Fixed, compiling agent (Go) and backend (TypeScript) builds.
 - `DEPLOYMENT_MODE` (self-hosted/SaaS) gating wired end-to-end (backend route mounting + frontend nav).
 - Dashboard fully wired to real backend data — no mocked auth, no hardcoded mock arrays.
@@ -10,8 +9,6 @@ This is the current, accurate status replacing the stale batch-tracking in the o
 - Razorpay billing scaffold (checkout, webhook, plan/usage), SaaS-mode only.
 - Restructured documentation set (`SRS.md`, `ARCHITECTURE.md`, new `FEATURE_TIERS.md`/`DEPLOYMENT.md`) reflecting the two-edition model.
 - Redesigned, light/glossy marketing website with a Use Cases section.
-
-Explicitly **not** in this week's build — deferred to Phase 1.5/2 below and tracked honestly rather than claimed as done: full Compliance framework support beyond CIS, Cost Optimization, MSP white-labeling, additional alert channels beyond Email/Slack/Webhook, Windows agent parity, PDF compliance report generation, AI Assistant polish beyond the existing OpenAI-backed engine.
 
 ## Phase 0: Foundations (Pre-MVP)
 - Backend scaffolding: API Gateway, Core API, Ingestion Service skeletons
@@ -40,15 +37,15 @@ Goal: a founder can install the agent and get real value within minutes, for Ubu
 
 **MVP Exit Criteria:** matches Acceptance Criteria in `SRS.md` §7.
 
-## Phase 1.5: Expansion of MVP Distro & Channel Support
-- CentOS, RHEL, AlmaLinux, Rocky Linux, Amazon Linux support
-- Additional alert channels: Teams, Discord, Telegram, WhatsApp, SMS
-- Log Intelligence (FR-12xx) — AI daily digest
-- AI Assistant v1 (FR-20xx) — read-only Q&A, no actions
-- Multi-Server Dashboard grouping (FR-18xx)
-- Network Monitoring (FR-8xx) with geo map
-- Domain Monitoring (FR-10xx)
-- Compliance Scanner v1 (FR-15xx) — CIS Linux Benchmark only, PDF export
+## Phase 1.5: Expansion of MVP Distro & Channel Support (complete except where noted — see `handoff.md` for exact verification level per item)
+- ✅ CentOS, RHEL, AlmaLinux, Rocky Linux, Amazon Linux support — `firewalld` fallback added to the security scanner when `ufw` isn't present; **not run on an actual RHEL-family host this session**, verified by `go build`/`go vet` + code review only.
+- ✅ Additional alert channels: Teams, Discord (already existed), Telegram, SMS (Twilio). ❌ **WhatsApp still not implemented** — needs Meta Business verification + pre-approved message templates, materially bigger than an API key; deferred.
+- ✅ Log Intelligence (FR-12xx) — AI daily digest UI, on top of the digest engine that already existed.
+- ✅ AI Assistant v1 (FR-20xx) — read-only Q&A UI, on top of the engine that already existed.
+- ✅ Multi-Server Dashboard grouping (FR-18xx) — `?group_by=environment|project|region|customer|tag` + health rollup, end-to-end verified in browser.
+- ❌ Network Monitoring (FR-8xx) with geo map — **deferred**, needs a new agent connection-tracking module + GeoIP database + map UI; large enough to be its own phase.
+- ❌ Domain Monitoring (FR-10xx) — **deferred**, DNS/WHOIS/SPF/DKIM/DMARC tracking is an entirely new backend-side module.
+- ✅ Compliance Scanner v1 (FR-15xx) — CIS-mapped PDF report generation via `pdfkit`, end-to-end verified (real PDF generated and downloaded through the UI). Covers only the 6 existing Vigilon scanner checks mapped to their nearest CIS control — not a full CIS Linux Benchmark assessment.
 
 ## Phase 2
 - Windows Agent

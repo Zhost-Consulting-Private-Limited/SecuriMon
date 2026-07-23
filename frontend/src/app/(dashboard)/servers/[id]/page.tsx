@@ -27,6 +27,7 @@ interface Finding {
   category: string;
   severity: string;
   passed: boolean;
+  autoFixable: boolean;
   status: string;
   businessImpactText: string | null;
   recommendedAction: string | null;
@@ -205,7 +206,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
               </div>
               <div className="flex items-center gap-3">
                 <SeverityBadge severity={f.severity} />
-                {!f.passed && f.status === "open" && (
+                {!f.passed && f.status === "open" && f.autoFixable && (
                   <button
                     onClick={() => handleFix(f.id)}
                     disabled={fixingId === f.id}
@@ -213,6 +214,9 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
                   >
                     {fixingId === f.id ? "Fixing..." : "One-click Fix"}
                   </button>
+                )}
+                {!f.passed && f.status === "open" && !f.autoFixable && (
+                  <span className="text-xs text-gray-400">Manual fix required</span>
                 )}
                 {f.status !== "open" && <span className="text-xs text-gray-400">{f.status}</span>}
               </div>

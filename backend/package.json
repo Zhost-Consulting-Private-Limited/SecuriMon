@@ -21,6 +21,7 @@
     "@types/node": "^26.1.1",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^8.0.1",
+    "@types/pdfkit": "^0.17.6",
     "@types/ws": "^8.18.1",
     "prisma": "^5.22.0",
     "tsx": "^4.23.1",
@@ -36,6 +37,7 @@
     "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
     "openai": "^6.48.0",
+    "pdfkit": "^0.19.1",
     "razorpay": "^2.9.8",
     "ws": "^8.21.1"
   }

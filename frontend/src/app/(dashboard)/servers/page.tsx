@@ -13,15 +13,37 @@ interface ServerSummary {
   lastSeenAt: string | null;
 }
 
+interface ServerGroup {
+  key: string;
+  rollup: { total: number; online: number; offline: number; avgOverallScore: number | null };
+  servers: ServerSummary[];
+}
+
+interface GroupedResponse {
+  groupBy: string;
+  groups: ServerGroup[];
+}
+
 interface InstallTokenResponse {
   token: string;
   expiresIn: string;
   installCommand: string;
 }
 
+const GROUP_OPTIONS = [
+  { value: "", label: "No grouping" },
+  { value: "environment", label: "Environment" },
+  { value: "project", label: "Project" },
+  { value: "region", label: "Region" },
+  { value: "customer", label: "Customer" },
+  { value: "tag", label: "Tag" },
+];
+
 export default function ServersPage() {
   const { token } = useAuth();
+  const [groupBy, setGroupBy] = useState("");
   const [servers, setServers] = useState<ServerSummary[] | null>(null);
+  const [groups, setGroups] = useState<ServerGroup[] | null>(null);
   const [error, setError] = useState("");
   const [installInfo, setInstallInfo] = useState<InstallTokenResponse | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -29,13 +51,23 @@ export default function ServersPage() {
 
   const loadServers = () => {
     if (!token) return;
-    api
-      .get<ServerSummary[]>("/v1/servers", token)
-      .then(setServers)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load servers"));
+    setError("");
+    if (groupBy) {
+      setGroups(null);
+      api
+        .get<GroupedResponse>(`/v1/servers?group_by=${groupBy}`, token)
+        .then((res) => setGroups(res.groups))
+        .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load servers"));
+    } else {
+      setServers(null);
+      api
+        .get<ServerSummary[]>("/v1/servers", token)
+        .then(setServers)
+        .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load servers"));
+    }
   };
 
-  useEffect(loadServers, [token]);
+  useEffect(loadServers, [token, groupBy]);
 
   const handleAddServer = async () => {
     if (!token) return;
@@ -58,6 +90,10 @@ export default function ServersPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const totalServerCount = groupBy
+    ? groups?.reduce((sum, g) => sum + g.rollup.total, 0) ?? null
+    : servers?.length ?? null;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -65,13 +101,26 @@ export default function ServersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Servers</h1>
           <p className="text-gray-600 mt-1">All servers monitored under your account</p>
         </div>
-        <button
-          onClick={handleAddServer}
-          disabled={generating}
-          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {generating ? "Generating..." : "+ Add Server"}
-        </button>
+        <div className="flex items-center gap-3">
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+          >
+            {GROUP_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAddServer}
+            disabled={generating}
+            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {generating ? "Generating..." : "+ Add Server"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>}
@@ -95,39 +144,66 @@ export default function ServersPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {servers === null && !error ? (
-          <div className="p-8 text-center text-gray-500">Loading servers...</div>
-        ) : servers && servers.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No servers yet. Click "Add Server" to install your first agent.</div>
+      {totalServerCount === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          No servers yet. Click "Add Server" to install your first agent.
+        </div>
+      ) : groupBy ? (
+        groups === null ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">Loading servers...</div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {servers?.map((s) => (
-              <Link
-                key={s.id}
-                href={`/servers/${s.id}`}
-                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50"
-              >
-                <div>
-                  <div className="text-sm font-medium text-gray-900">{s.hostname}</div>
-                  <div className="text-sm text-gray-500">{s.os ?? "Unknown OS"}</div>
+          <div className="space-y-6">
+            {groups.map((group) => (
+              <div key={group.key} className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                  <h2 className="text-sm font-semibold text-gray-900">{group.key}</h2>
+                  <span className="text-sm text-gray-500">
+                    {group.rollup.online}/{group.rollup.total} online
+                    {group.rollup.avgOverallScore != null ? ` · avg score ${group.rollup.avgOverallScore}%` : ""}
+                  </span>
                 </div>
-                <span
-                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    s.status === "online"
-                      ? "bg-green-100 text-green-800"
-                      : s.status === "pending"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {s.status}
-                </span>
-              </Link>
+                <div className="divide-y divide-gray-200">
+                  {group.servers.map((s) => (
+                    <ServerRow key={s.id} server={s} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
-        )}
-      </div>
+        )
+      ) : servers === null ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">Loading servers...</div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="divide-y divide-gray-200">
+            {servers.map((s) => (
+              <ServerRow key={s.id} server={s} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function ServerRow({ server }: { server: ServerSummary }) {
+  return (
+    <Link href={`/servers/${server.id}`} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50">
+      <div>
+        <div className="text-sm font-medium text-gray-900">{server.hostname}</div>
+        <div className="text-sm text-gray-500">{server.os ?? "Unknown OS"}</div>
+      </div>
+      <span
+        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+          server.status === "online"
+            ? "bg-green-100 text-green-800"
+            : server.status === "pending"
+            ? "bg-yellow-100 text-yellow-800"
+            : "bg-red-100 text-red-800"
+        }`}
+      >
+        {server.status}
+      </span>
+    </Link>
   );
 }

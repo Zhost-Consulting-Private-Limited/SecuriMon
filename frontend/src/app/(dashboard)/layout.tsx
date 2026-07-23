@@ -11,8 +11,11 @@ const NAV_ITEMS = [
   { href: "/inventory", label: "Inventory", icon: "📦" },
   { href: "/applications", label: "Applications", icon: "🧩" },
   { href: "/scan", label: "Scans", icon: "🔍" },
+  { href: "/compliance", label: "Compliance", icon: "✅" },
   { href: "/threats", label: "Threats", icon: "⚠️" },
   { href: "/alerts", label: "Alerts", icon: "🔔" },
+  { href: "/assistant", label: "AI Assistant", icon: "🤖" },
+  { href: "/digest", label: "Daily Digest", icon: "📰" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 

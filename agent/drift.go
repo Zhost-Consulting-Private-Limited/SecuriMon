@@ -20,6 +20,16 @@ var watchedBinaries = []string{
 	"/bin/bash", "/usr/bin/ssh", "/usr/sbin/sshd", "/usr/bin/sudo", "/usr/bin/passwd",
 }
 
+// defaultFimWatchPaths are used when the user hasn't set Config.FIMWatchPaths - common
+// web-server config files worth knowing if they change unexpectedly. Paths that don't
+// exist on a given host are silently skipped (see collectWatchedItems), so it's safe to
+// list paths for servers that aren't running that particular web server.
+var defaultFimWatchPaths = []string{
+	"/etc/nginx/nginx.conf",
+	"/etc/apache2/apache2.conf",
+	"/etc/httpd/conf/httpd.conf", // RHEL-family Apache path
+}
+
 type driftBaseline map[string]string // watched-item key -> sha256 hex digest
 
 func hashBytes(data []byte) string {
@@ -69,10 +79,23 @@ func rootCrontabHash() (string, bool) {
 	return hashBytes(out), true
 }
 
+func fimPathsToWatch(config *Config) []string {
+	if len(config.FIMWatchPaths) > 0 {
+		return config.FIMWatchPaths
+	}
+	return defaultFimWatchPaths
+}
+
 // collectWatchedItems returns a map of watched-item key -> current content hash, for
 // every item that currently exists/is readable. Missing items are simply omitted rather
-// than treated as an error, since e.g. /etc/cron.d may legitimately not exist.
-func collectWatchedItems() map[string]string {
+// than treated as an error, since e.g. /etc/cron.d (or a given web server's config)
+// may legitimately not exist on this host. Keys are prefixed by category so
+// classifyDriftKey can determine the right event type without a second lookup:
+//   - "file:"     cron drop-in files (/etc/crontab, /etc/cron.d/*)
+//   - "crontab:"  root's crontab
+//   - "binary:"   high-value system binaries
+//   - "fim:"      user- or default-configured File Integrity Monitoring paths
+func collectWatchedItems(config *Config) map[string]string {
 	items := map[string]string{}
 
 	if h, err := hashFile("/etc/crontab"); err == nil {
@@ -101,14 +124,54 @@ func collectWatchedItems() map[string]string {
 		}
 	}
 
+	for _, p := range fimPathsToWatch(config) {
+		if h, err := hashFile(p); err == nil {
+			items["fim:"+p] = h
+		}
+	}
+
 	return items
 }
 
-// RunDriftDetection hashes a small set of security-relevant cron files/entries and
-// system binaries and diffs them against a locally stored baseline (FR-5xx "suspicious
-// cron/binary changes", overlapping Phase 3's Configuration Drift Detection). Linux-only:
-// cron paths and binary locations here are Linux-specific, matching the existing
-// Linux-only world-writable scan in scanner.go.
+// classifyDriftKey maps a collectWatchedItems key to the ThreatEvent type it should be
+// reported as. Pure function, exported from I/O for testability.
+func classifyDriftKey(key string) string {
+	switch {
+	case strings.HasPrefix(key, "binary:"):
+		return "binary_change"
+	case strings.HasPrefix(key, "fim:"):
+		return "file_integrity_change"
+	default:
+		return "cron_change"
+	}
+}
+
+type driftDiff struct {
+	key       string
+	eventType string
+}
+
+// computeDriftDiffs is the pure, testable core of drift detection: given a previous
+// baseline and the current snapshot, it returns one driftDiff per key that existed in
+// the baseline with a different hash now. Keys with no prior baseline entry are treated
+// as newly-observed (first sighting), not a change - this is what prevents an alert
+// flood the first time the agent runs against a host it hasn't seen before.
+func computeDriftDiffs(baseline driftBaseline, current map[string]string) []driftDiff {
+	var diffs []driftDiff
+	for key, hash := range current {
+		if prevHash, existed := baseline[key]; existed && prevHash != hash {
+			diffs = append(diffs, driftDiff{key: key, eventType: classifyDriftKey(key)})
+		}
+	}
+	return diffs
+}
+
+// RunDriftDetection hashes a small set of security-relevant cron files/entries, system
+// binaries, and File Integrity Monitoring paths, and diffs them against a locally stored
+// baseline (FR-5xx "suspicious cron/binary changes", Phase 3's Configuration Drift
+// Detection and File Integrity Monitoring). Linux-only: cron/binary/web-config paths
+// here are Linux-specific, matching the existing Linux-only world-writable scan in
+// scanner.go.
 func RunDriftDetection(config *Config) {
 	if runtime.GOOS != "linux" {
 		return
@@ -116,37 +179,31 @@ func RunDriftDetection(config *Config) {
 
 	baseline := loadBaseline()
 	firstRun := len(baseline) == 0
-	current := collectWatchedItems()
-	changedCount := 0
+	current := collectWatchedItems(config)
+	diffs := computeDriftDiffs(baseline, current)
+
+	for _, d := range diffs {
+		event := &ThreatEvent{
+			EventType:  d.eventType,
+			Severity:   "HIGH",
+			Detail:     fmt.Sprintf("%s changed unexpectedly since the last scan", d.key),
+			OccurredAt: time.Now().UTC().Format(time.RFC3339),
+		}
+
+		log.Printf("Threat detected: %s - %s", d.eventType, event.Detail)
+		if err := SendThreatEvent(config.BackendURL, config.ServerID, config.APIKey, event); err != nil {
+			log.Printf("Failed to push threat event: %v", err)
+		}
+	}
 
 	for key, hash := range current {
-		prevHash, existed := baseline[key]
-		if existed && prevHash != hash {
-			eventType := "binary_change"
-			if !strings.HasPrefix(key, "binary:") {
-				eventType = "cron_change"
-			}
-
-			event := &ThreatEvent{
-				EventType:  eventType,
-				Severity:   "HIGH",
-				Detail:     fmt.Sprintf("%s changed unexpectedly since the last scan", key),
-				OccurredAt: time.Now().UTC().Format(time.RFC3339),
-			}
-
-			log.Printf("Threat detected: %s - %s", eventType, event.Detail)
-			if err := SendThreatEvent(config.BackendURL, config.ServerID, config.APIKey, event); err != nil {
-				log.Printf("Failed to push threat event: %v", err)
-			}
-			changedCount++
-		}
 		baseline[key] = hash
 	}
 
 	if firstRun {
 		log.Printf("Drift detection: established baseline for %d watched items", len(current))
-	} else if changedCount > 0 {
-		log.Printf("Drift detection: %d change(s) detected and baseline updated", changedCount)
+	} else if len(diffs) > 0 {
+		log.Printf("Drift detection: %d change(s) detected and baseline updated", len(diffs))
 	}
 
 	saveBaseline(baseline)

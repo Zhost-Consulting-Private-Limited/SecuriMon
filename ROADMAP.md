@@ -74,14 +74,18 @@ Working overnight (2026-07-24) through Phase 3 items that don't need cloud/clust
 
 - ✅ Secrets Scanner (detect exposed credentials/keys in configs) — new `agent/secrets.go`: bounded regex scan for AWS access keys, PEM private-key blocks, and hardcoded password/secret assignments across `.env`/`.yml`/`.yaml`/`.conf`/`.json` files under `/etc`, `/opt`, `/var/www`. Reports via the existing findings pipeline; never transmits the matched secret value itself. **Verified with the repo's first automated test suite** (`agent/secrets_test.go`, 6 passing tests exercising the detection logic directly against planted fixtures) plus a real API round-trip through the findings/risk-scoring pipeline.
 
+## Phase 3 Batch C (complete — see `handoff.md` for exact verification level)
+
+- ✅ File Integrity Monitoring (FIM) — generalized Batch A's drift-detection mechanism: `Config.FIMWatchPaths` lets an operator specify a custom watch list (no dashboard UI for this yet, hand-edit the agent config for now), defaulting to common web-server config paths otherwise. Changes now report as a distinct `file_integrity_change` event type. **Verified with 7 new automated tests** covering the pure diff/classification logic (13 agent tests total now), plus a real event round-trip through the ingestion pipeline.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
 - Self-Healing Infrastructure (broader automated recovery playbooks)
-- Patch Management (scheduled, tested OS/package patching)
-- File Integrity Monitoring (FIM) — beyond the binary/cron baseline already covered by Batch A's drift detection
+- Patch Management (scheduled, tested OS/package patching) — detection-only version planned as Batch D
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
 - Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
+- Dashboard UI for configuring per-server FIM watch paths (Batch C added the agent-side mechanism only)
 
 ## Phase 4
 - Endpoint Detection & Response (EDR)

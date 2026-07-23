@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os/exec"
 	"runtime"
@@ -31,6 +32,16 @@ func ExecuteRemediation(action string, params map[string]interface{}) (string, e
 		}
 		// Restart SSH service to apply changes
 		exec.Command("systemctl", "restart", "sshd").Run()
+		return string(out), nil
+
+	case "rotate_logs":
+		if _, err := exec.LookPath("logrotate"); err != nil {
+			return "failed", fmt.Errorf("logrotate not found on this host")
+		}
+		out, err := exec.Command("logrotate", "-f", "/etc/logrotate.conf").CombinedOutput()
+		if err != nil {
+			return "failed", err
+		}
 		return string(out), nil
 
 	case "block_ip":

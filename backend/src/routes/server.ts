@@ -8,7 +8,7 @@ import { generateCisReport, reportFilePath } from '../services/compliance/report
 const router = Router();
 
 // Never send apiKeyHash to the dashboard - it's a credential, even hashed.
-const SERVER_PUBLIC_SELECT = {
+export const SERVER_PUBLIC_SELECT = {
   id: true,
   tenantId: true,
   hostname: true,

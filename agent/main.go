@@ -10,14 +10,14 @@ import (
 )
 
 func main() {
-	fmt.Println("SecuriMon Agent starting...")
+	fmt.Println("Vigilon Agent starting...")
 
 	// Load configuration
-	configPath := "/etc/securimon/agent.conf"
+	configPath := "/etc/vigilon/agent.conf"
 
 	// On Windows, use a different default path
 	if os.Getenv("OS") == "Windows_NT" {
-		configPath = os.Getenv("ProgramData") + "\\SecuriMon\\agent.conf"
+		configPath = os.Getenv("ProgramData") + "\\Vigilon\\agent.conf"
 	}
 
 	config, err := LoadConfig(configPath)
@@ -71,14 +71,17 @@ func main() {
 
 	// Main execution loop (Heartbeat / Telemetry)
 	ticker := time.NewTicker(60 * time.Second)
-	scanTicker := time.NewTicker(1 * time.Hour) // Run security scan hourly
+	scanTicker := time.NewTicker(1 * time.Hour)  // Run security scan hourly
+	appTicker := time.NewTicker(5 * time.Minute) // Refresh application inventory
 	defer ticker.Stop()
 	defer scanTicker.Stop()
+	defer appTicker.Stop()
 
 	log.Println("Agent initialized and entering main loop...")
 
-	// Run initial security scan
+	// Run initial security scan and application discovery
 	go runAndPushScan(config)
+	go runAndPushApplications(config)
 
 	for {
 		select {
@@ -98,11 +101,25 @@ func main() {
 			}
 		case <-scanTicker.C:
 			go runAndPushScan(config)
+		case <-appTicker.C:
+			go runAndPushApplications(config)
 		case sig := <-sigChan:
 			log.Printf("Received signal: %v. Shutting down gracefully...", sig)
 			// TODO: Clean up resources, flush buffers
 			return
 		}
+	}
+}
+
+func runAndPushApplications(config *Config) {
+	services := DiscoverApplications()
+	if len(services) == 0 {
+		return
+	}
+	if err := SendApplicationServices(config.BackendURL, config.ServerID, config.APIKey, services); err != nil {
+		log.Printf("Failed to push application inventory: %v", err)
+	} else {
+		log.Printf("Pushed %d running services successfully.", len(services))
 	}
 }
 

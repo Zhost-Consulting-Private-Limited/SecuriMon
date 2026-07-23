@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
-## Project: SecuriMon — Autonomous Server Operations Platform
+## Project: Vigilon — Enterprise Server Security, Monitoring & Audit Platform
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft for Development
 **Document Owner:** Zhost Consulting Private Limited
 **Powered By:** <a href="www.bithost.in" target="_blank">Bithost</a>
@@ -12,15 +12,17 @@
 ## 1. Introduction
 
 ### 1.1 Purpose
-This document specifies the functional and system requirements for SecuriMon, a SaaS platform that continuously monitors, secures, and optimizes Linux servers on behalf of businesses that do not have dedicated DevOps or security staff. It is intended to be used directly by engineering (human or AI) to design, build, and test the product.
+This document specifies the functional and system requirements for Vigilon, an enterprise-grade security, monitoring, and audit platform that continuously watches, secures, and reports on servers and the services running on them, on behalf of startups, SMEs, developers, and DevOps teams who do not want (or cannot afford) to build and staff a dedicated DevOps/security/compliance function. It is intended to be used directly by engineering (human or AI) to design, build, and test the product.
+
+Vigilon is explicitly **not limited to web servers or application servers** — the agent and its detection/scoring logic are designed to observe and assess any service running on a monitored host (databases, queues, cache layers, background workers, internal tooling, etc.), giving the platform manager a single view of the attack surface and health of the whole fleet, not just the parts that happen to serve HTTP traffic.
 
 ### 1.2 Scope
-SecuriMon consists of:
-- A lightweight **Agent** installed on customer Linux servers via a single install command.
-- A **Cloud Backend** that ingests telemetry, stores state, runs analysis, and serves the API.
-- A **Web Dashboard** where customers view server health, security posture, threats, costs, and compliance, and configure alerts and remediations.
+Vigilon consists of:
+- A lightweight **Agent** installed on customer servers (cloud or on-premises) via a single install command.
+- A **Backend** that ingests telemetry, stores state, runs analysis, and serves the API — operated either by the customer (Self-Hosted edition) or by Vigilon/an MSP as a managed service (SaaS edition). See §2.7 and `FEATURE_TIERS.md` for the edition split.
+- A **Web Dashboard** where customers view server health, security posture, threats, audit/compliance evidence, and (SaaS) costs, and configure alerts and remediations.
 
-SecuriMon must **not** be positioned or built as "just another monitoring tool." Feature parity with Grafana/Datadog/New Relic/Zabbix/Prometheus is explicitly out of scope as a goal; the product's differentiation is the combination of monitoring + security + auto-remediation + compliance + AI guidance in one always-on system requiring zero configuration.
+Vigilon must **not** be positioned or built as "just another monitoring tool." Feature parity with Grafana/Datadog/New Relic/Zabbix/Prometheus is explicitly out of scope as a goal; the product's differentiation is the combination of monitoring + security hardening + threat detection + auto-remediation + compliance/audit reporting + AI guidance in one always-on system requiring zero configuration, deployable either as a self-hosted platform or a managed SaaS.
 
 ### 1.3 Intended Audience
 - Engineering teams (backend, agent, frontend, AI) building the product
@@ -39,7 +41,7 @@ SecuriMon must **not** be positioned or built as "just another monitoring tool."
 | CVE | Common Vulnerabilities and Exposures identifier |
 
 ### 1.5 References
-- Original SecuriMon PRD (source document)
+- Original Vigilon PRD (source document)
 - CIS Benchmarks for Linux
 - OWASP Top 10
 - ISO 27001, SOC2, HIPAA, PCI DSS, NIST frameworks (for compliance module)
@@ -49,7 +51,7 @@ SecuriMon must **not** be positioned or built as "just another monitoring tool."
 ## 2. Overall Description
 
 ### 2.1 Product Perspective
-SecuriMon is a new, standalone SaaS product. It is cloud-provider agnostic and works on AWS, Azure, GCP, DigitalOcean, Hetzner, Oracle Cloud, and on-premise Linux VMs. It is composed of three deployable units: Agent, Backend API, and Dashboard frontend, communicating over authenticated HTTPS/WebSocket channels.
+Vigilon is a new, standalone SaaS product. It is cloud-provider agnostic and works on AWS, Azure, GCP, DigitalOcean, Hetzner, Oracle Cloud, and on-premise Linux VMs. It is composed of three deployable units: Agent, Backend API, and Dashboard frontend, communicating over authenticated HTTPS/WebSocket channels.
 
 ### 2.2 Product Philosophy (Design Constraints)
 1. The customer should **never need to SSH into the server** unless they choose to.
@@ -85,9 +87,18 @@ SecuriMon is a new, standalone SaaS product. It is cloud-provider agnostic and w
 - Auto-remediation actions must be reversible or logged with rollback information where feasible
 
 ### 2.6 Assumptions and Dependencies
-- Target servers have outbound internet access to reach the SecuriMon backend (agent uses outbound-only connections; no inbound ports required on the customer server).
+- Target servers have outbound internet access to reach the Vigilon backend (agent uses outbound-only connections; no inbound ports required on the customer server).
 - Customers grant the agent root or sudo-equivalent privileges for hardening/remediation actions.
 - Cloud provider billing API access (for cost optimization module) is optional and requires customer-provided read-only credentials.
+
+### 2.7 Deployment Editions
+
+Vigilon ships from a single codebase in two editions, selected at backend boot by a `DEPLOYMENT_MODE` setting. The full feature-by-feature matrix is the canonical `FEATURE_TIERS.md`; this section states the product-level distinction only.
+
+- **Self-Hosted Edition**: the customer runs the backend, database, and agents entirely on their own infrastructure. Single-tenant (one organization's servers), no billing subsystem, no MSP/white-label capability, community support. This is the edition for teams that want full data ownership and are comfortable operating a small Node.js + Postgres/SQLite service themselves (see `DEPLOYMENT.md` Part A).
+- **SaaS Edition**: Vigilon (or an MSP reselling it) operates the backend as a managed multi-tenant service. Billed via Razorpay subscriptions (Free/Pro/Business), supports MSP parent-tenant management and white-labeling on the Business tier, vendor-supported (see `DEPLOYMENT.md` Part B).
+
+Both editions expose the same core product experience (the four guiding questions in §2.2 apply equally to both) — the difference is operational (who runs it, who pays for it) and in a small number of tenancy/billing-dependent features, not in the quality or completeness of the core monitoring/security/audit functionality.
 
 ---
 

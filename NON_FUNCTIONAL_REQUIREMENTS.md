@@ -1,4 +1,4 @@
-# SecuriMon — Non-Functional Requirements (NFR)
+# Vigilon — Non-Functional Requirements (NFR)
 
 ## 1. Performance
 | Requirement | Target |
@@ -34,7 +34,7 @@
 ## 5. Compliance
 - Compliance module must support mapping to: CIS Linux Benchmark, ISO 27001, SOC2, HIPAA, PCI DSS, OWASP, NIST.
 - Generated compliance PDF reports must be timestamped and reflect the exact scan data used to produce them (immutable snapshot).
-- SecuriMon's own infrastructure (as a SaaS handling customer server data) should target SOC2 Type II compliance as a business goal (separate from the product's compliance-scanning feature).
+- Vigilon's own infrastructure (as a SaaS handling customer server data) should target SOC2 Type II compliance as a business goal (separate from the product's compliance-scanning feature).
 
 ## 6. Usability
 - The four guiding questions (health / app status / attack status / priority fix) must be answerable within 60 seconds of dashboard load — validated via usability testing with non-technical target users (SMB owners, founders).
@@ -61,7 +61,7 @@
 - Agent must run on: Ubuntu, Debian, CentOS, RHEL, AlmaLinux, Rocky Linux, Amazon Linux (x86_64 and arm64).
 - No dependency on a specific cloud provider; must function identically on AWS, Azure, GCP, DigitalOcean, Hetzner, Oracle Cloud, and on-premise/bare-metal Linux.
 
-## 10. Observability (of SecuriMon itself)
+## 10. Observability (of Vigilon itself)
 - Backend services must emit their own metrics/logs/traces for internal operational monitoring (dogfooding is encouraged but a separate concern from the customer-facing product).
 - Alert delivery success/failure must be tracked and surfaced (e.g. a failed Slack webhook delivery should itself be visible/alertable to the account owner).
 

@@ -1,4 +1,4 @@
-# SecuriMon — User Stories & Acceptance Criteria
+# Vigilon — User Stories & Acceptance Criteria
 
 Format: `As a [role], I want [capability], so that [benefit].` Each story includes acceptance criteria (AC) suitable for QA sign-off or AI-agent self-verification.
 

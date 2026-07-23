@@ -161,6 +161,8 @@ model Application {
   status          String? // running | stopped | crash_loop
   restartCount24h Int       @default(0)
   lastRestartAt   DateTime?
+
+  @@unique([serverId, name])
 }
 
 model SecurityScan {

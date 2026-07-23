@@ -29,8 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Load auth from localStorage on mount
-    const storedToken = localStorage.getItem("securimon_token");
-    const storedUser = localStorage.getItem("securimon_user");
+    const storedToken = localStorage.getItem("vigilon_token");
+    const storedUser = localStorage.getItem("vigilon_user");
     
     if (storedToken && storedUser) {
       setToken(storedToken);
@@ -41,29 +41,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Protect routes
+    // Protect routes: everything under these prefixes requires auth; everything else
+    // (marketing pages, login, register) is public. Listed explicitly rather than
+    // inferred so a new dashboard route must be added here deliberately.
+    const PROTECTED_PREFIXES = [
+      "/dashboard",
+      "/servers",
+      "/scan",
+      "/threats",
+      "/applications",
+      "/inventory",
+      "/alerts",
+      "/settings",
+      "/billing",
+    ];
+    const isProtectedRoute = PROTECTED_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname?.startsWith(`${prefix}/`)
+    );
+    const isAuthRoute = pathname === "/login" || pathname === "/register";
+
     if (isLoaded) {
-      const isPublicRoute = pathname === "/login" || pathname === "/register" || pathname === "/";
-      
-      if (!token && !isPublicRoute) {
+      if (!token && isProtectedRoute) {
         router.push("/login");
-      } else if (token && (pathname === "/login" || pathname === "/register")) {
+      } else if (token && isAuthRoute) {
         router.push("/dashboard");
       }
     }
   }, [token, isLoaded, pathname, router]);
 
   const login = (newToken: string, newUser: User) => {
-    localStorage.setItem("securimon_token", newToken);
-    localStorage.setItem("securimon_user", JSON.stringify(newUser));
+    localStorage.setItem("vigilon_token", newToken);
+    localStorage.setItem("vigilon_user", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
     router.push("/dashboard");
   };
 
   const logout = () => {
-    localStorage.removeItem("securimon_token");
-    localStorage.removeItem("securimon_user");
+    localStorage.removeItem("vigilon_token");
+    localStorage.removeItem("vigilon_user");
     setToken(null);
     setUser(null);
     router.push("/login");

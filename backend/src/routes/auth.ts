@@ -2,9 +2,10 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
+import { authenticate, AuthRequest } from '../middlewares/auth';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'securimon-super-secret-key-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET || 'vigilon-super-secret-key-change-in-prod';
 const JWT_EXPIRES_IN = '1d';
 
 // Temporary route to create the first tenant and user for testing
@@ -73,6 +74,37 @@ router.post('/login', async (req: Request, res: Response) => {
     token,
     user: { id: user.id, email: user.email, role: user.role, tenantId: user.tenantId },
   });
+});
+
+// Reissues a fresh token for an already-authenticated session (sliding expiry).
+router.post('/refresh', authenticate, async (req: AuthRequest, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const token = jwt.sign({ id: user.id, tenantId: user.tenantId, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  res.json({ token, user: { id: user.id, email: user.email, role: user.role, tenantId: user.tenantId } });
+});
+
+// MSP: switch the active tenant context to one of the caller's managed sub-tenants.
+router.post('/switch-tenant', authenticate, async (req: AuthRequest, res: Response) => {
+  const { targetTenantId } = req.body;
+  if (!targetTenantId) {
+    return res.status(400).json({ error: 'targetTenantId is required' });
+  }
+
+  const targetTenant = await prisma.tenant.findFirst({
+    where: { id: targetTenantId, parentMspTenantId: req.user!.tenantId },
+  });
+
+  if (!targetTenant) {
+    return res.status(403).json({ error: 'Not an MSP-managed tenant for this account' });
+  }
+
+  const token = jwt.sign({ id: req.user!.id, tenantId: targetTenant.id, role: req.user!.role }, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+  });
+
+  res.json({ token, tenant: { id: targetTenant.id, name: targetTenant.name } });
 });
 
 export default router;

@@ -1,4 +1,17 @@
-# SecuriMon — Build Roadmap
+# Vigilon — Build Roadmap
+
+## This Week's Build (Restructure Sprint)
+
+This is the current, accurate status replacing the stale batch-tracking in the old `handoff.md`. Shipping this week:
+- Fixed, compiling agent (Go) and backend (TypeScript) builds.
+- `DEPLOYMENT_MODE` (self-hosted/SaaS) gating wired end-to-end (backend route mounting + frontend nav).
+- Dashboard fully wired to real backend data — no mocked auth, no hardcoded mock arrays.
+- A real Alerts engine (rules + evaluator + Email/Slack/Webhook delivery) — previously schema-only.
+- Razorpay billing scaffold (checkout, webhook, plan/usage), SaaS-mode only.
+- Restructured documentation set (`SRS.md`, `ARCHITECTURE.md`, new `FEATURE_TIERS.md`/`DEPLOYMENT.md`) reflecting the two-edition model.
+- Redesigned, light/glossy marketing website with a Use Cases section.
+
+Explicitly **not** in this week's build — deferred to Phase 1.5/2 below and tracked honestly rather than claimed as done: full Compliance framework support beyond CIS, Cost Optimization, MSP white-labeling, additional alert channels beyond Email/Slack/Webhook, Windows agent parity, PDF compliance report generation, AI Assistant polish beyond the existing OpenAI-backed engine.
 
 ## Phase 0: Foundations (Pre-MVP)
 - Backend scaffolding: API Gateway, Core API, Ingestion Service skeletons
@@ -82,12 +95,15 @@ Goal: a founder can install the agent and get real value within minutes, for Ubu
 | 13–14 | Multi-distro support, hardening, usability testing against 4 guiding questions |
 | 15+ | Phase 1.5 features (AI digest, AI Assistant v1, additional distros/channels) |
 
-## Pricing Tier Alignment (from PRD)
+## Pricing Tier Alignment
 
-| Tier | Servers | Included Modules |
+See `FEATURE_TIERS.md` for the canonical, full feature-by-feature matrix (this table is a summary and must not drift from it).
+
+| Edition / Tier | Servers | Included Modules |
 |---|---|---|
-| Free | 1 | Basic Monitoring, Basic Alerts |
-| Pro | 10 | + Advanced Monitoring, Threat Detection, AI Assistant, Reports |
-| Business | Unlimited | + Multi-Tenant, Compliance, API access, SSO, White Label |
+| Self-Hosted | Unlimited (your infra) | Full core module set (monitoring, security, threat detection, alerts, compliance-CIS, risk scoring); no billing/MSP/white-label; AI features are bring-your-own-key |
+| SaaS Free | 1 | Basic Monitoring, Basic Alerts (Email only) |
+| SaaS Pro | 10 | + Advanced Monitoring, Threat Detection, AI Assistant, Reports, all MVP alert channels |
+| SaaS Business | Unlimited | + Multi-Tenant, full Compliance, Cost Optimization, API access, SSO, White Label |
 
-Feature flags in the backend should map cleanly to these tiers from day one to avoid costly re-architecture later.
+Feature flags in the backend map cleanly to these tiers via the `DEPLOYMENT_MODE` gate plus `tenants.plan`, as described in `ARCHITECTURE.md` §7, to avoid costly re-architecture later.

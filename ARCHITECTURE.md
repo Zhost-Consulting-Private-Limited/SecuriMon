@@ -1,4 +1,4 @@
-# SecuriMon — System Architecture
+# Vigilon — System Architecture
 
 ## 1. High-Level Overview
 
@@ -107,3 +107,17 @@ User question (dashboard) → Core API → AI Service → Context retrieval (sco
 - Ingestion Service and Message Bus sized for high-frequency, low-payload telemetry (thousands of servers reporting every 30–60s).
 - Time-series store uses downsampling/retention policies (raw 24h → 5-min for 30 days → hourly for 90 days) to bound storage growth.
 - AI Service calls are scoped and cached where possible (e.g. daily log digest generated once per server per day, not per request).
+
+## 7. Deployment Modes & Feature Gating
+
+Vigilon is one codebase, one build, deployed either **Self-Hosted** or **SaaS** (see `SRS.md` §2.7, full matrix in `FEATURE_TIERS.md`). The mode is selected by a single environment variable read once at Core API boot:
+
+```
+DEPLOYMENT_MODE=self_hosted   # or: saas
+```
+
+- A small `getDeploymentMode()` / `isSaas()` helper in the Core API is the single place this variable is read. All other code asks that helper, never `process.env.DEPLOYMENT_MODE` directly, so the gating logic stays in one place.
+- **Route mounting, not per-request permission checks, is the gate.** In `self_hosted` mode, the Billing router (`/v1/billing/*`) and the MSP/tenant-management router (`/v1/tenants/*`) are simply never `app.use()`'d — a self-hosted deployment has those endpoints return 404, not 403, and carries zero runtime dependency on the Razorpay SDK actually being configured.
+- The dashboard frontend calls `GET /v1/config` on load, which returns `{ deploymentMode, features: {...} }`; the frontend uses this to hide (not just disable) Billing/MSP navigation entirely in self-hosted builds.
+- `tenants.plan` (see `DATABASE_SCHEMA.md` §1) continues to drive SaaS plan-tier feature flags (Free/Pro/Business) independent of the deployment-mode gate; a self-hosted tenant is treated as Business-equivalent capability minus the billing/MSP/white-label features that don't apply to a self-run deployment (see `FEATURE_TIERS.md` §2 matrix).
+- This approach was chosen over maintaining two separate codebases/branches because the Prisma schema, agent protocol, and dashboard UI are already tenant-shaped — duplicating them would mean fixing every bug twice.

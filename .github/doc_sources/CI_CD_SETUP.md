@@ -1,8 +1,8 @@
-# SecuriMon CI/CD Pipeline Configuration
+# Vigilon CI/CD Pipeline Configuration
 # Version 1.0 - Cross-Platform Build & Testing Automation
 
 ## Overview
-This directory contains GitHub Actions workflows for building, testing, and deploying the SecuriMon platform across multiple platforms (Windows, Linux).
+This directory contains GitHub Actions workflows for building, testing, and deploying the Vigilon platform across multiple platforms (Windows, Linux).
 
 ## Key Features
 
@@ -193,7 +193,7 @@ jobs:
     steps:
       - name: Deploy to Staging
         run: |
-          ssh user@staging-server "cd /opt/securimon && git pull"
+          ssh user@staging-server "cd /opt/vigilon && git pull"
           ssh user@staging-server "docker-compose up -d"
           ssh user@staging-server "curl http://localhost:8080/health"
 
@@ -204,7 +204,7 @@ jobs:
     steps:
       - name: Deploy to Production
         run: |
-          ssh user@production-server "cd /opt/securimon && git pull"
+          ssh user@production-server "cd /opt/vigilon && git pull"
           ssh user@production-server "docker-compose down && docker-compose up -d"
 ```
 
@@ -258,4 +258,4 @@ jobs:
 
 ---
 
-This CI/CD system provides a comprehensive, secure, and scalable solution for the SecuriMon platform, supporting cross-platform builds, comprehensive testing, and automated deployment with enterprise-grade security and reliability.
+This CI/CD system provides a comprehensive, secure, and scalable solution for the Vigilon platform, supporting cross-platform builds, comprehensive testing, and automated deployment with enterprise-grade security and reliability.

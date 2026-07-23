@@ -1,6 +1,8 @@
-# SecuriMon - Implementation Plan
+# Vigilon - Implementation Plan
 
-This document breaks down the development of the SecuriMon platform into sequential, manageable batches. It adheres to the constraints of a monolithic Node.js backend (with Prisma supporting both SQLite and PostgreSQL), a Next.js frontend, a Go-based agent, and a bare-metal/VM deployment strategy (no Docker/K8s).
+This document breaks down the development of the Vigilon platform into sequential, manageable batches. It adheres to the constraints of a monolithic Node.js backend (with Prisma supporting both SQLite and PostgreSQL), a Next.js frontend, a Go-based agent, and a bare-metal/VM deployment strategy (no Docker/K8s).
+
+> **Status note (2026-07-23):** a full code audit found several batches below marked complete in the old `handoff.md` did not correspond to working code (see `handoff.md`'s "Baseline Audit Findings"). This file is kept as historical reference for the intended long-term batch sequence; for the current, accurate build status see `ROADMAP.md` → "This Week's Build" and `handoff.md`. Treat any checkbox-like claim in the batch descriptions below as a target, not a verified fact.
 
 ## Phase 1: Foundation & Core Infrastructure
 *   **Batch A: Project Initialization & Monorepo Scaffold**
@@ -20,7 +22,7 @@ This document breaks down the development of the SecuriMon platform into sequent
     *   Implement systemd service creation inside the install script.
 *   **Batch E: Agent Registration & API Handshake**
     *   Backend: `/v1/agent/register` API.
-    *   Agent: Initial check-in, API key generation, and saving config to `/etc/securimon/agent.conf`.
+    *   Agent: Initial check-in, API key generation, and saving config to `/etc/vigilon/agent.conf`.
 
 ## Phase 2: Telemetry & Ingestion
 *   **Batch F: System & Hardware Discovery (Agent)**
@@ -122,7 +124,7 @@ This document breaks down the development of the SecuriMon platform into sequent
     *   Create a clean uninstaller script (`uninstall.sh` and Windows equivalent) to remove the agent and configuration completely.
 *   **Batch II: Data Retention & Backend Backups**
     *   Implement background cron jobs in the Node.js backend to prune old metrics (e.g., delete raw data > 30 days old).
-    *   Create an automated script to backup the SecuriMon database (SQLite/Postgres) and upload it to an external S3-compatible storage.
+    *   Create an automated script to backup the Vigilon database (SQLite/Postgres) and upload it to an external S3-compatible storage.
 *   **Batch JJ: Privacy & Compliance (GDPR/CCPA)**
     *   Implement "Delete Account" functionality that cascade-deletes all tenant data, servers, metrics, and triggers a self-destruct command to connected agents.
 *   **Batch KK: CI/CD Security & E2E Testing**

@@ -157,5 +157,9 @@ func RunSecurityScan() []SecurityFinding {
 	// Secrets Scanner). See secrets.go - never includes the actual matched value.
 	findings = append(findings, RunSecretsScan()...)
 
+	// 5. Check for available OS package updates (Phase 3 Patch Management,
+	// detection-only). See patches.go.
+	findings = append(findings, RunPatchCheck()...)
+
 	return findings
 }

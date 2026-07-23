@@ -78,14 +78,21 @@ Working overnight (2026-07-24) through Phase 3 items that don't need cloud/clust
 
 - ✅ File Integrity Monitoring (FIM) — generalized Batch A's drift-detection mechanism: `Config.FIMWatchPaths` lets an operator specify a custom watch list (no dashboard UI for this yet, hand-edit the agent config for now), defaulting to common web-server config paths otherwise. Changes now report as a distinct `file_integrity_change` event type. **Verified with 7 new automated tests** covering the pure diff/classification logic (13 agent tests total now), plus a real event round-trip through the ingestion pipeline.
 
+## Phase 3 Batch D (complete — see `handoff.md` for exact verification level)
+
+- ✅ Patch Management, **detection-only** (scheduled/tested auto-patching remains future work — see below) — new `agent/patches.go`: detects whichever package manager exists (`apt`/`dnf`/`yum`), counts upgradable packages, flags security updates (heuristic for apt via `-security` repo suffix; native `--security` filter for dnf/yum). Reports via the existing findings pipeline. **Verified with 6 new automated tests** (19 agent tests total now) covering the output-parsing logic against realistic fixtures, plus a real finding round-trip through the ingestion/risk-scoring pipeline. The `apt`/`yum`/`dnf` command-invocation branches themselves have not run against a real package manager (no Linux/RHEL-family host this session) — only their parsing logic is tested.
+
+This is the planned stopping point for tonight's standing autonomous-work plan — all four queued batches (A-D) are done. See `handoff.md` "Current Status" for the exact PR/merge state of each.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
 - Self-Healing Infrastructure (broader automated recovery playbooks)
-- Patch Management (scheduled, tested OS/package patching) — detection-only version planned as Batch D
+- Scheduled/tested auto-patching (applying the updates Batch D only detects) — needs its own careful design: opt-in policy, maintenance windows, rollback story, same reasoning that kept Batch D detection-only
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
 - Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
 - Dashboard UI for configuring per-server FIM watch paths (Batch C added the agent-side mechanism only)
+- Port scan detection (Phase 1 MVP's original Threat Detection promise, still outstanding after Batch A — see Phase 3 Batch A above)
 
 ## Phase 4
 - Endpoint Detection & Response (EDR)

@@ -79,9 +79,10 @@ func main() {
 
 	log.Println("Agent initialized and entering main loop...")
 
-	// Run initial security scan and application discovery
+	// Run initial security scan, application discovery, and drift baseline
 	go runAndPushScan(config)
 	go runAndPushApplications(config)
+	go RunDriftDetection(config)
 
 	for {
 		select {
@@ -99,8 +100,11 @@ func main() {
 			} else {
 				log.Println("Telemetry pushed successfully.")
 			}
+
+			go ScanForCryptoMiners(config)
 		case <-scanTicker.C:
 			go runAndPushScan(config)
+			go RunDriftDetection(config)
 		case <-appTicker.C:
 			go runAndPushApplications(config)
 		case sig := <-sigChan:

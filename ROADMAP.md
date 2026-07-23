@@ -24,7 +24,7 @@ Goal: a founder can install the agent and get real value within minutes, for Ubu
 - Server Overview (FR-2xx)
 - Infrastructure Discovery (FR-3xx) — Ubuntu, Debian
 - Security Hardening Scanner (FR-4xx) — SSH, Firewall, Kernel, Users, Filesystem, Packages
-- Threat Detection (FR-5xx) — brute-force, port scan, crypto-miner, suspicious cron/binary changes
+- Threat Detection (FR-5xx) — brute-force ✅, crypto-miner ✅ (Phase 3 Batch A), suspicious cron/binary changes ✅ (Phase 3 Batch A), port scan ❌ (still not implemented — see Phase 3 Batch A note below)
 - Application Monitoring (FR-6xx) — PM2, systemd, Docker
 - Resource Monitoring (FR-7xx)
 - SSL Monitoring (FR-9xx)
@@ -62,15 +62,22 @@ Deferred within this same FR-21xx/19xx scope, tracked honestly:
 - **Cloud provider integrations: AWS, Azure, GCP** (billing API, deeper metadata) + **Cost Optimization module (FR-13xx)** — needs real cloud billing credentials; building this without them would produce untestable, likely-wrong code.
 - **Full Compliance framework support: ISO 27001, SOC2, HIPAA, PCI DSS, OWASP, NIST** — see note above; needs real per-framework scanner checks, not relabeling.
 
-## Phase 3
+## Phase 3 Batch A (complete — see `handoff.md` for exact verification level)
+
+Working overnight (2026-07-24) through Phase 3 items that don't need cloud/cluster access the way the rest of Phase 2 does, per an owner-approved standing autonomous-work plan. Batch A closes Phase 1 MVP's own original Threat Detection promise (only SSH brute-force had ever actually been built, despite "crypto-miner, suspicious cron/binary changes" being listed since Phase 1):
+
+- ✅ Crypto-miner detection (part of FR-5xx) — new `agent/anomaly.go`, cross-platform via `gopsutil/v3/process`: known-miner-binary-name match, or sustained high CPU from an unrecognized process. **Verified with a real, unstaged detection**: the actual compiled agent, run for a live 60s cycle on the dev machine, genuinely flagged a real high-CPU process on that machine and it round-tripped correctly to the backend — not just a synthetic test.
+- ✅ Suspicious cron/binary changes (part of FR-5xx) / Configuration Drift Detection — new `agent/drift.go`, Linux-only: baseline-hash diffing of cron files/entries and 5 high-value system binaries, stored locally, first-run establishes baseline (no alert flood on install). **Not run on an actual Linux host this session** — verified by `go build`/`go vet` + code review only.
+- ❌ Port scan detection (also part of FR-5xx's original Phase 1 promise) — still not implemented. Needs connection-tracking, not just process listing; a heavier lift, not attempted in Batch A.
+
+## Phase 3 (remaining)
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
 - Self-Healing Infrastructure (broader automated recovery playbooks)
 - Patch Management (scheduled, tested OS/package patching)
-- Configuration Drift Detection
 - Secrets Scanner (detect exposed credentials/keys in configs, repos, env files)
 - File Integrity Monitoring (FIM)
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
-- Malware Detection (signature + behavioral)
+- Malware Detection (signature + behavioral) — crypto-miner detection above is a first slice of this
 - Cloud Security Posture Management (CSPM)
 
 ## Phase 4

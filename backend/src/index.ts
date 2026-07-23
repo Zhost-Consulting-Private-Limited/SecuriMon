@@ -10,6 +10,8 @@ import serverRoutes from './routes/server';
 import aiRoutes from './routes/ai';
 import alertRoutes from './routes/alerts';
 import billingRoutes, { handleRazorpayWebhook } from './routes/billing';
+import tenantsRoutes from './routes/tenants';
+import remediationRoutes from './routes/remediation';
 import { startMetricsAggregator } from './jobs/metricsAggregator';
 import { setupWebSocket } from './ws';
 import { getDeploymentMode, isSaas } from './config';
@@ -54,11 +56,13 @@ app.use('/v1/servers', serverRoutes);
 app.use('/v1/ai', aiRoutes);
 app.use('/v1/logs', aiRoutes);
 app.use('/v1/alerts', alertRoutes);
+app.use('/v1/remediation', remediationRoutes);
 
 // Billing/MSP surface only exists in SaaS mode — self-hosted deployments never mount
 // this router, so the routes 404 rather than being permission-checked per request.
 if (isSaas()) {
   app.use('/v1/billing', billingRoutes);
+  app.use('/v1/tenants', tenantsRoutes);
 }
 
 // Health check endpoint

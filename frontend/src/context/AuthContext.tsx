@@ -55,6 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       "/assistant",
       "/digest",
       "/compliance",
+      "/remediation",
+      "/tenants",
       "/settings",
       "/billing",
     ];

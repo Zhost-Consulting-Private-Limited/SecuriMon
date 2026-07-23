@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../utils/prisma';
+import { sendCommandToAgent } from '../ws';
+import { isAutoRemediationEnabled } from './remediation';
 
 const router = Router();
 
@@ -136,6 +138,23 @@ router.post('/:serverId/events', authenticateAgent, async (req: AgentRequest, re
   }
 
   try {
+    let autoRemediated = event.auto_remediated || false;
+
+    // Auto-Remediation (FR-21xx): if this tenant has opted in to auto-blocking brute-force
+    // sources, dispatch it now rather than waiting for a manual one-click fix.
+    if (event.event_type === 'ssh_bruteforce' && event.source_ip) {
+      const enabled = await isAutoRemediationEnabled(req.server.tenantId, 'block_ip');
+      if (enabled) {
+        try {
+          await sendCommandToAgent(serverId, 'block_ip', { ip: event.source_ip }, 'threat_event');
+          autoRemediated = true;
+        } catch (dispatchErr) {
+          // Agent likely offline - not fatal to recording the threat event itself.
+          console.error('Auto-remediation dispatch failed:', dispatchErr);
+        }
+      }
+    }
+
     await prisma.threatEvent.create({
       data: {
         serverId,
@@ -144,10 +163,10 @@ router.post('/:serverId/events', authenticateAgent, async (req: AgentRequest, re
         sourceIp: event.source_ip,
         detail: event.detail,
         occurredAt: new Date(event.occurred_at),
-        autoRemediated: event.auto_remediated || false
+        autoRemediated
       }
     });
-    
+
     // Create Timeline event
     await prisma.timelineEvent.create({
       data: {
@@ -159,7 +178,7 @@ router.post('/:serverId/events', authenticateAgent, async (req: AgentRequest, re
       }
     });
 
-    res.status(202).json({ message: 'Threat event recorded' });
+    res.status(202).json({ message: 'Threat event recorded', autoRemediated });
   } catch (error: any) {
     console.error('Error saving threat event:', error);
     res.status(500).json({ error: 'Failed to process threat event' });

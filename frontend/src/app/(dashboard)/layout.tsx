@@ -2,8 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { api } from "../../lib/api";
+
+interface AppConfig {
+  deploymentMode: "self_hosted" | "saas";
+  features: { billing: boolean; msp: boolean };
+}
+
+interface WhiteLabelConfig {
+  companyName: string | null;
+  primaryColor: string | null;
+  logoUrl: string | null;
+}
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
@@ -13,25 +25,33 @@ const NAV_ITEMS = [
   { href: "/scan", label: "Scans", icon: "🔍" },
   { href: "/compliance", label: "Compliance", icon: "✅" },
   { href: "/threats", label: "Threats", icon: "⚠️" },
+  { href: "/remediation", label: "Remediation", icon: "🛠️" },
   { href: "/alerts", label: "Alerts", icon: "🔔" },
   { href: "/assistant", label: "AI Assistant", icon: "🤖" },
   { href: "/digest", label: "Daily Digest", icon: "📰" },
+  { href: "/tenants", label: "Managed Tenants", icon: "🏢", mspOnly: true },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
-function Sidebar() {
+function Sidebar({ config, whiteLabel }: { config: AppConfig | null; whiteLabel: WhiteLabelConfig | null }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+
+  const items = NAV_ITEMS.filter((item) => !item.mspOnly || config?.features.msp);
+  const brandName = whiteLabel?.companyName || "Vigilon";
+  const accent = whiteLabel?.primaryColor || undefined;
 
   return (
     <aside className="w-64 bg-white shadow-lg h-screen sticky top-0 flex flex-col">
       <div className="p-6">
-        <h1 className="text-xl font-bold text-gray-900">Vigilon</h1>
+        <h1 className="text-xl font-bold text-gray-900" style={accent ? { color: accent } : undefined}>
+          {brandName}
+        </h1>
         <p className="text-sm text-gray-600 mt-1">Server Security Dashboard</p>
       </div>
 
       <nav className="mt-2 flex-1">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           return (
             <Link
@@ -78,9 +98,25 @@ function Sidebar() {
 }
 
 export default function DashboardGroupLayout({ children }: { children: ReactNode }) {
+  const { token } = useAuth();
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [whiteLabel, setWhiteLabel] = useState<WhiteLabelConfig | null>(null);
+
+  useEffect(() => {
+    api.get<AppConfig>("/v1/config").then(setConfig).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!token || !config?.features.msp) return;
+    api
+      .get<WhiteLabelConfig | null>("/v1/tenants/white-label", token)
+      .then(setWhiteLabel)
+      .catch(() => {});
+  }, [token, config]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar />
+      <Sidebar config={config} whiteLabel={whiteLabel} />
       <main className="flex-1 overflow-y-auto">
         <div className="p-8">{children}</div>
       </main>

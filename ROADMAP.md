@@ -47,16 +47,20 @@ Goal: a founder can install the agent and get real value within minutes, for Ubu
 - ❌ Domain Monitoring (FR-10xx) — **deferred**, DNS/WHOIS/SPF/DKIM/DMARC tracking is an entirely new backend-side module.
 - ✅ Compliance Scanner v1 (FR-15xx) — CIS-mapped PDF report generation via `pdfkit`, end-to-end verified (real PDF generated and downloaded through the UI). Covers only the 6 existing Vigilon scanner checks mapped to their nearest CIS control — not a full CIS Linux Benchmark assessment.
 
-## Phase 2
-- Windows Agent
-- macOS Agent
-- Kubernetes Monitoring (deep)
-- Docker Deep Monitoring
-- Cloud provider integrations: AWS, Azure, GCP (billing API, deeper metadata)
-- Cost Optimization module (FR-13xx), dependent on cloud billing integration
-- Multi-Tenant Support for MSPs (FR-19xx), white-label branding
-- Auto Protection / Auto-Remediation expansion (FR-21xx) — full action set with per-category opt-in
-- Full Compliance framework support: ISO 27001, SOC2, HIPAA, PCI DSS, OWASP, NIST
+## Phase 2 Batch 1 (complete — see `handoff.md` for exact verification level per item)
+- ✅ Multi-Tenant Support for MSPs (FR-19xx) — sub-tenant create/list, tenant switching (reusing the existing `POST /v1/auth/switch-tenant`), SaaS-only. **End-to-end verified**: real cross-tenant data isolation confirmed (a server registered under a managed sub-tenant is invisible from the parent's own server list, only visible via the dedicated `/v1/tenants/:id/servers` endpoint), and switching into a non-managed tenant correctly 403s.
+- ✅ White-label branding (part of FR-19xx, Business-tier) — company name/color/logo config, applied to the dashboard sidebar. **End-to-end verified**: saved via Settings, confirmed the sidebar picks it up.
+- ✅ Auto-Remediation policy expansion (FR-21xx) — per-action opt-in (`RemediationPolicy`, previously schema-only with zero code), safe actions default on / destructive default off. A new `rotate_logs` action added to the agent's whitelist. **End-to-end verified with a real connected agent**: a synthetic `ssh_bruteforce` event does *not* auto-remediate with the policy off, and *does* — with a real `block_ip` command dispatched over a live WebSocket to the actual compiled agent — once the policy is enabled.
+
+Deferred within this same FR-21xx/19xx scope, tracked honestly:
+- The `block_ip` agent action still only supports `ufw`, not `firewalld` — so auto-remediation won't work on RHEL-family hosts yet even though the security scanner already detects `firewalld` there (Phase 1.5). Small, known inconsistency, not fixed this batch.
+- Full compliance framework support (ISO27001/SOC2/HIPAA/PCI-DSS/OWASP/NIST) was considered for this batch and explicitly **not** attempted — the only honest way to build it is dozens of additional real scanner checks per framework, not relabeling the 6 CIS-mapped checks that already exist. Left for a dedicated future phase sized to that real scope.
+
+## Phase 2 (remaining — deferred, reasons noted)
+- **Windows Agent / macOS Agent** — no macOS host available this session; Windows has a partial skeleton (telemetry/WS loop works, security scanning/remediation are real no-ops) but full parity (registry-based checks, Windows Firewall via netsh, Windows service enumeration) needs its own pass.
+- **Kubernetes Monitoring (deep) / Docker Deep Monitoring** — needs a real cluster/Docker host to build and verify against meaningfully.
+- **Cloud provider integrations: AWS, Azure, GCP** (billing API, deeper metadata) + **Cost Optimization module (FR-13xx)** — needs real cloud billing credentials; building this without them would produce untestable, likely-wrong code.
+- **Full Compliance framework support: ISO 27001, SOC2, HIPAA, PCI DSS, OWASP, NIST** — see note above; needs real per-framework scanner checks, not relabeling.
 
 ## Phase 3
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)

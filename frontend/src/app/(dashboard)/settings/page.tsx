@@ -22,6 +22,12 @@ interface CheckoutOrder {
   keyId: string;
 }
 
+interface WhiteLabelConfig {
+  companyName: string | null;
+  primaryColor: string | null;
+  logoUrl: string | null;
+}
+
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
@@ -32,6 +38,8 @@ export default function SettingsPage() {
   const { user, token } = useAuth();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [whiteLabel, setWhiteLabel] = useState<WhiteLabelConfig>({ companyName: "", primaryColor: "", logoUrl: "" });
+  const [savingBranding, setSavingBranding] = useState(false);
   const [error, setError] = useState("");
   const [upgrading, setUpgrading] = useState<string | null>(null);
 
@@ -46,6 +54,28 @@ export default function SettingsPage() {
       .then(setUsage)
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load billing info"));
   }, [token, config]);
+
+  useEffect(() => {
+    if (!token || !config?.features.msp || usage?.plan !== "business") return;
+    api
+      .get<WhiteLabelConfig | null>("/v1/tenants/white-label", token)
+      .then((cfg) => cfg && setWhiteLabel(cfg))
+      .catch(() => {});
+  }, [token, config, usage]);
+
+  const handleSaveBranding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSavingBranding(true);
+    setError("");
+    try {
+      await api.put("/v1/tenants/white-label", whiteLabel, token);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to save branding");
+    } finally {
+      setSavingBranding(false);
+    }
+  };
 
   const handleUpgrade = async (plan: "pro" | "business") => {
     if (!token) return;
@@ -137,6 +167,48 @@ export default function SettingsPage() {
           ) : (
             <p className="text-sm text-gray-500">Loading billing info...</p>
           )}
+        </div>
+      )}
+
+      {config?.features.msp && usage?.plan === "business" && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">White-Label Branding</h2>
+          <form onSubmit={handleSaveBranding} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <input
+                value={whiteLabel.companyName ?? ""}
+                onChange={(e) => setWhiteLabel({ ...whiteLabel, companyName: e.target.value })}
+                placeholder="Vigilon"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
+              <input
+                value={whiteLabel.primaryColor ?? ""}
+                onChange={(e) => setWhiteLabel({ ...whiteLabel, primaryColor: e.target.value })}
+                placeholder="#4f46e5"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+              <input
+                value={whiteLabel.logoUrl ?? ""}
+                onChange={(e) => setWhiteLabel({ ...whiteLabel, logoUrl: e.target.value })}
+                placeholder="https://your-cdn.example/logo.png"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={savingBranding}
+              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {savingBranding ? "Saving..." : "Save Branding"}
+            </button>
+          </form>
         </div>
       )}
 

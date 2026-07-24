@@ -103,6 +103,18 @@ This was the planned stopping point after tonight's original four batches (A-D);
 - Verified end-to-end against a real registered test tenant/server with a synthetic non-auto-fixable `ssh.root_login` finding (direct curl to the new endpoint) and via a real browser click-through on the server detail page; both correctly produced the honest "not configured" degraded response (this dev environment's `OPENAI_API_KEY` is a placeholder), consistent with every other AI-touching verification this session.
 - Known limitation, stated rather than silently accepted: no caching — every click re-calls the AI.
 
+## Phase 3 Batch H (complete — see `handoff.md` for exact verification level)
+
+Prompted directly by the user asking for production-readiness and "best security standards" instead of a new feature — a backend security audit found and fixed concrete, exploitable gaps rather than theoretical ones:
+
+- ✅ **Critical**: removed a hardcoded JWT secret fallback (`'vigilon-super-secret-key-change-in-prod'`, publicly visible in source) that any deployment forgetting to set `JWT_SECRET` would have silently run with. New `backend/src/utils/jwt.ts` now fails fast at process startup instead.
+- ✅ Rate limiting (`express-rate-limit`) on the auth endpoints against brute-force/credential-stuffing, plus a generous global safety-net limiter elsewhere that won't throttle real agent fleets.
+- ✅ `helmet` for standard secure headers, with `crossOriginResourcePolicy` deliberately relaxed since this API is meant to be called cross-origin by its own frontend.
+- ✅ CORS restricted to an explicit `CORS_ORIGIN`-driven allowlist instead of reflecting any origin.
+- ✅ Minimum 8-character password policy on registration.
+- Reviewed and accepted, not changed: agent API-key auth (already hash+DB-lookup based, no timing-attack surface); frontend `npm audit`'s `postcss`/`sharp` findings (transitive to Next's bundled build tooling; the suggested fix downgrades `next` 16→9, a nonsensical breaking change for build-time-only advisories).
+- Explicitly deferred: JWT-in-`localStorage` (vs. an `httpOnly` cookie) is a known further hardening step, not attempted this batch to avoid risking the working login flow.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation — the **propose** half now exists (Batch G, above); the **execute** half (AI proposes and, with approval or configured trust level, executes fixes automatically) still needs its own approval workflow and trust-level infrastructure and is deliberately deferred
 - Self-Healing Infrastructure (broader automated recovery playbooks)

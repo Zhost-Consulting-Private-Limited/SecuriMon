@@ -222,3 +222,67 @@ Be specific and reference actual events when possible.`;
     };
   }
 }
+
+export interface FindingRemediationInput {
+  ruleId: string;
+  category: string;
+  severity: string;
+  businessImpactText: string | null;
+  recommendedAction: string | null;
+  detail: string | null;
+}
+
+export interface ServerIdentity {
+  hostname: string;
+  os: string | null;
+}
+
+// AI Suggested Fix (Phase 3): for findings without a one-click fix (autoFixable: false),
+// this proposes a specific remediation - it never executes anything. Auto-remediation's
+// trust model (Phase 2 Batch 1's RemediationPolicy) is untouched; this is read-only.
+export async function generateFindingRemediation(
+  finding: FindingRemediationInput,
+  server: ServerIdentity
+): Promise<AIResponse> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+
+  if (!openaiKey) {
+    return {
+      answer: 'AI suggested fix not configured. Please set OPENAI_API_KEY environment variable.',
+      citations: [{ type: 'config', title: 'AI Configuration Required' }],
+    };
+  }
+
+  const prompt = `A security scanner found the following issue on server '${server.hostname}' (OS: ${server.os || 'unknown'}), and it has no automated one-click fix available:
+
+RULE: ${finding.ruleId}
+CATEGORY: ${finding.category}
+SEVERITY: ${finding.severity}
+BUSINESS IMPACT: ${finding.businessImpactText || 'Not specified'}
+GENERAL RECOMMENDATION: ${finding.recommendedAction || 'Not specified'}
+DETAIL: ${finding.detail || 'Not specified'}
+
+Provide a specific, actionable, step-by-step remediation a server administrator can follow manually. Include exact commands or config changes where applicable. Do not suggest running the fix automatically - a human will act on this manually.`;
+
+  try {
+    const openai = new OpenAI({ apiKey: openaiKey });
+    const completion = await openai.chat.completions.create({
+      model: process.env.AI_MODEL || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 1000,
+      temperature: 0.3,
+    });
+
+    const content = completion.choices[0]?.message?.content || 'No response generated.';
+    return parseAIResponse(content);
+  } catch (error: any) {
+    console.error('OpenAI API error for finding remediation:', error.message);
+    return {
+      answer: `AI suggested fix failed: ${error.message}. Please check your API configuration.`,
+      citations: [{ type: 'error', title: 'API Error' }],
+    };
+  }
+}

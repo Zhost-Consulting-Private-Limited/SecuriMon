@@ -24,7 +24,7 @@ Goal: a founder can install the agent and get real value within minutes, for Ubu
 - Server Overview (FR-2xx)
 - Infrastructure Discovery (FR-3xx) — Ubuntu, Debian
 - Security Hardening Scanner (FR-4xx) — SSH, Firewall, Kernel, Users, Filesystem, Packages
-- Threat Detection (FR-5xx) — brute-force ✅, crypto-miner ✅ (Phase 3 Batch A), suspicious cron/binary changes ✅ (Phase 3 Batch A), port scan ❌ (still not implemented — see Phase 3 Batch A note below)
+- Threat Detection (FR-5xx) — brute-force ✅, crypto-miner ✅ (Phase 3 Batch A), suspicious cron/binary changes ✅ (Phase 3 Batch A), port scan ✅ (Phase 3 Batch F) — **all four original Phase 1 promises now real**
 - Application Monitoring (FR-6xx) — PM2, systemd, Docker
 - Resource Monitoring (FR-7xx)
 - SSL Monitoring (FR-9xx)
@@ -89,7 +89,13 @@ Closes two gaps explicitly flagged in Batches A-D rather than left silently inco
 - ✅ Firewalld-aware `block_ip` — the security scanner detected `firewalld` since Phase 1.5, but the `block_ip` remediation action stayed `ufw`-only until now. `agent/remediation.go` detects the right tool and uses `firewall-cmd`'s rich-rule syntax on RHEL-family hosts, with the IP validated via `net.ParseIP` first (a malformed "IP" could otherwise break out of the rich-rule string, since `firewall-cmd` parses its own grammar). **4 new tests**, can't exercise a real `firewall-cmd` without a RHEL-family host this session.
 - ✅ Dashboard-configurable FIM watch paths — implements the "config channel" `AGENT_SPEC.md` has always described (dashboard → backend → agent) for the first time, using it to carry FIM watch paths. New `Server.desiredConfig` column, `PUT`/`GET /v1/servers/:id/config`, agent-facing `GET /v1/agent/:serverId/config`, a new Configuration tab on the server detail page, and `agent/remoteconfig.go` polling it on startup and every hourly scan tick. **Verified with the strongest technique used all night**: a real agent process, restarted after the dashboard set new paths, logged picking them up and persisted them to its own local config file — the full loop, not a backend-only round-trip.
 
-This was the planned stopping point after tonight's original four batches (A-D); Batch E addresses two of the gaps they left behind. See `handoff.md` "Current Status" for the exact PR/merge state.
+## Phase 3 Batch F (complete — see `handoff.md` for exact verification level)
+
+- ✅ Port scan detection — the last of Phase 1 MVP's four original Threat Detection promises (brute-force, crypto-miner, cron/binary drift, port scan) to get built. New `agent/portscan.go`: polls `gopsutil/v3/net.Connections("tcp")` (cross-platform), flags a remote IP hitting 5+ of this host's actual listening services within a 5-minute window, 15-min per-IP cooldown. **10 new tests, 38 agent tests total.**
+- **A real false-positive bug was caught by the verification process itself**: the first version counted any distinct local port an IP touched, which meant this host's own *outbound* connections (each getting a random ephemeral local port) looked identical to a scan. Running the real compiled agent surfaced this immediately (false positives against loopback and a real outbound peer); fixed by only counting hits against ports this host is confirmed to be listening on and excluding loopback, then re-verified clean with both new unit tests and another real agent run.
+- Honest scope: catches completed-handshake "connect scans" against real running services; misses stealth SYN scans and probes against closed/non-listening ports, which never produce a visible connection at all.
+
+This was the planned stopping point after tonight's original four batches (A-D); Batches E and F closed the gaps and the outstanding item they left behind. See `handoff.md` "Current Status" for the exact PR/merge state.
 
 ## Phase 3 (remaining)
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
@@ -98,7 +104,6 @@ This was the planned stopping point after tonight's original four batches (A-D);
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
 - Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
-- Port scan detection (Phase 1 MVP's original Threat Detection promise, still outstanding after Batch A — see Phase 3 Batch A above)
 - Expanding the Batch E config channel to cover the rest of `AGENT_SPEC.md`'s documented fields (`metrics_interval_seconds`, `scan_schedule`, `auto_remediation` flags, `log_sources`) — only FIM watch paths are wired through it so far
 
 ## Phase 4

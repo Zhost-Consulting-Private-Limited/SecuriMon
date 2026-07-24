@@ -97,8 +97,14 @@ Closes two gaps explicitly flagged in Batches A-D rather than left silently inco
 
 This was the planned stopping point after tonight's original four batches (A-D); Batches E and F closed the gaps and the outstanding item they left behind. See `handoff.md` "Current Status" for the exact PR/merge state.
 
+## Phase 3 Batch G (complete — see `handoff.md` for exact verification level)
+
+- ✅ AI Suggested Fix — the **propose** half of "AI Auto-Remediation" (see below), scoped deliberately smaller than the full execute-capable version. New `generateFindingRemediation()` in `backend/src/services/ai/engine.ts` (same graceful-degradation pattern as the existing server-analysis/log-digest AI functions) and `POST /v1/servers/:serverId/findings/:findingId/suggest-fix`, called from a new "AI Suggested Fix" button on the server detail page's Security Findings tab for findings with no one-click fix (`autoFixable: false`). Strictly read-only: no `sendCommandToAgent` call, no finding-status change, no interaction with Phase 2 Batch 1's `RemediationPolicy` trust model.
+- Verified end-to-end against a real registered test tenant/server with a synthetic non-auto-fixable `ssh.root_login` finding (direct curl to the new endpoint) and via a real browser click-through on the server detail page; both correctly produced the honest "not configured" degraded response (this dev environment's `OPENAI_API_KEY` is a placeholder), consistent with every other AI-touching verification this session.
+- Known limitation, stated rather than silently accepted: no caching — every click re-calls the AI.
+
 ## Phase 3 (remaining)
-- AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
+- AI Auto-Remediation — the **propose** half now exists (Batch G, above); the **execute** half (AI proposes and, with approval or configured trust level, executes fixes automatically) still needs its own approval workflow and trust-level infrastructure and is deliberately deferred
 - Self-Healing Infrastructure (broader automated recovery playbooks)
 - Scheduled/tested auto-patching (applying the updates Batch D only detects) — needs its own careful design: opt-in policy, maintenance windows, rollback story, same reasoning that kept Batch D detection-only
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)

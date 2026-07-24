@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middlewares/auth';
 import { prisma } from '../utils/prisma';
 import { sendCommandToAgent } from '../ws';
 import { generateCisReport, reportFilePath } from '../services/compliance/report';
+import { generateFindingRemediation } from '../services/ai/engine';
 
 const router = Router();
 
@@ -339,6 +340,36 @@ router.post('/:serverId/findings/:findingId/fix', authenticate, async (req: Auth
   } catch (error: any) {
     res.status(503).json({ error: error.message });
   }
+});
+
+// AI Suggested Fix (Phase 3): for findings with no one-click fix, ask the AI engine for
+// a specific manual remediation. Read-only - does not dispatch anything to the agent or
+// change the finding's status, unlike the .../fix endpoint above.
+router.post('/:serverId/findings/:findingId/suggest-fix', authenticate, async (req: AuthRequest, res: Response) => {
+  const server = await loadOwnedServer(req, res);
+  if (!server) return;
+
+  const findingId = typeof req.params.findingId === 'string' ? req.params.findingId : undefined;
+  if (!findingId) return res.status(400).json({ error: 'findingId is required' });
+
+  const finding = await prisma.securityFinding.findFirst({ where: { id: findingId, serverId: server.id } });
+  if (!finding) return res.status(404).json({ error: 'Finding not found' });
+
+  const fullServer = await prisma.server.findUnique({ where: { id: server.id }, select: { hostname: true, os: true } });
+
+  const response = await generateFindingRemediation(
+    {
+      ruleId: finding.ruleId,
+      category: finding.category,
+      severity: finding.severity,
+      businessImpactText: finding.businessImpactText,
+      recommendedAction: finding.recommendedAction,
+      detail: finding.detail,
+    },
+    { hostname: fullServer?.hostname ?? server.id, os: fullServer?.os ?? null }
+  );
+
+  res.json(response);
 });
 
 // Generate a CIS-mapped compliance PDF from the server's current findings (FR-15xx v1:

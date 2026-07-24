@@ -62,6 +62,13 @@ interface ServerConfig {
   fimWatchPaths: string[];
 }
 
+interface AISuggestion {
+  loading: boolean;
+  answer?: string;
+  citations?: { type: string; metric?: string; title?: string }[];
+  error?: string;
+}
+
 type Tab = "overview" | "security" | "threats" | "timeline" | "applications" | "configuration";
 
 export default function ServerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +87,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState("");
   const [rescanning, setRescanning] = useState(false);
   const [fixingId, setFixingId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Record<string, AISuggestion>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -139,6 +147,32 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
       setError(describe(e));
     } finally {
       setRescanning(false);
+    }
+  };
+
+  const handleSuggestFix = async (findingId: string) => {
+    if (!token) return;
+    // Collapse if already open with a result; otherwise (re-)fetch. No caching across
+    // page loads this batch - each expand re-calls the AI, a known limitation.
+    if (suggestions[findingId] && !suggestions[findingId].loading) {
+      setSuggestions((prev) => {
+        const next = { ...prev };
+        delete next[findingId];
+        return next;
+      });
+      return;
+    }
+
+    setSuggestions((prev) => ({ ...prev, [findingId]: { loading: true } }));
+    try {
+      const res = await api.post<{ answer: string; citations: AISuggestion["citations"] }>(
+        `/v1/servers/${id}/findings/${findingId}/suggest-fix`,
+        {},
+        token
+      );
+      setSuggestions((prev) => ({ ...prev, [findingId]: { loading: false, answer: res.answer, citations: res.citations } }));
+    } catch (e) {
+      setSuggestions((prev) => ({ ...prev, [findingId]: { loading: false, error: describe(e) } }));
     }
   };
 
@@ -233,30 +267,68 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
         <ListPanel
           items={findings}
           empty="No security findings yet. Run a scan to check this server's hardening posture."
-          render={(f: Finding) => (
-            <div key={f.id} className="px-6 py-4 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium text-gray-900">{f.ruleId}</div>
-                <div className="text-sm text-gray-500 mt-1">{f.businessImpactText ?? f.recommendedAction ?? f.category}</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <SeverityBadge severity={f.severity} />
-                {!f.passed && f.status === "open" && f.autoFixable && (
-                  <button
-                    onClick={() => handleFix(f.id)}
-                    disabled={fixingId === f.id}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
-                  >
-                    {fixingId === f.id ? "Fixing..." : "One-click Fix"}
-                  </button>
+          render={(f: Finding) => {
+            const suggestion = suggestions[f.id];
+            return (
+              <div key={f.id}>
+                <div className="px-6 py-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{f.ruleId}</div>
+                    <div className="text-sm text-gray-500 mt-1">{f.businessImpactText ?? f.recommendedAction ?? f.category}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <SeverityBadge severity={f.severity} />
+                    {!f.passed && f.status === "open" && f.autoFixable && (
+                      <button
+                        onClick={() => handleFix(f.id)}
+                        disabled={fixingId === f.id}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
+                      >
+                        {fixingId === f.id ? "Fixing..." : "One-click Fix"}
+                      </button>
+                    )}
+                    {!f.passed && f.status === "open" && !f.autoFixable && (
+                      <button
+                        onClick={() => handleSuggestFix(f.id)}
+                        disabled={suggestion?.loading}
+                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium disabled:opacity-50"
+                      >
+                        {suggestion?.loading
+                          ? "Asking AI..."
+                          : suggestion
+                          ? "Hide Suggestion"
+                          : "AI Suggested Fix"}
+                      </button>
+                    )}
+                    {f.status !== "open" && <span className="text-xs text-gray-400">{f.status}</span>}
+                  </div>
+                </div>
+                {suggestion && !suggestion.loading && (
+                  <div className="px-6 pb-4">
+                    {suggestion.error ? (
+                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                        {suggestion.error}
+                      </div>
+                    ) : (
+                      <div className="bg-indigo-50 rounded-md p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                        {suggestion.answer}
+                        {suggestion.citations && suggestion.citations.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-indigo-100 flex flex-wrap gap-2">
+                            {suggestion.citations.map((c, i) => (
+                              <span key={i} className="text-xs px-2 py-1 rounded-full bg-white text-gray-600">
+                                {c.type}
+                                {c.title ? `: ${c.title}` : ""}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
-                {!f.passed && f.status === "open" && !f.autoFixable && (
-                  <span className="text-xs text-gray-400">Manual fix required</span>
-                )}
-                {f.status !== "open" && <span className="text-xs text-gray-400">{f.status}</span>}
               </div>
-            </div>
-          )}
+            );
+          }}
         />
       )}
 

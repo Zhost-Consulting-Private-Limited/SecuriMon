@@ -19,6 +19,12 @@ type Config struct {
 	// the agent tails for generic ERROR/WARNING lines (see logwatch.go). Dashboard-set,
 	// delivered via the same config channel as FIMWatchPaths.
 	LogSources []string `json:"log_sources,omitempty"`
+	// MetricsIntervalSeconds, if set, overrides the default 60s telemetry cadence (see
+	// schedule.go's telemetryInterval). Dashboard-set, delivered via the config channel.
+	MetricsIntervalSeconds int `json:"metrics_interval_seconds,omitempty"`
+	// ScanSchedule, if set, overrides the default hourly security-scan cadence (see
+	// schedule.go's scanInterval). One of "hourly" (default) or "daily".
+	ScanSchedule string `json:"scan_schedule,omitempty"`
 }
 
 // LoadConfig reads and parses the JSON configuration file

@@ -95,7 +95,12 @@ router.post('/register', async (req: Request, res: Response) => {
 router.get('/:serverId/config', authenticateAgent, async (req: AgentRequest, res: Response) => {
   const server = await prisma.server.findUnique({ where: { id: req.server.id }, select: { desiredConfig: true } });
   const config = server?.desiredConfig ? JSON.parse(server.desiredConfig) : {};
-  res.json({ fim_watch_paths: config.fimWatchPaths ?? [], log_sources: config.logSources ?? [] });
+  res.json({
+    fim_watch_paths: config.fimWatchPaths ?? [],
+    log_sources: config.logSources ?? [],
+    metrics_interval_seconds: config.metricsIntervalSeconds ?? 0,
+    scan_schedule: config.scanSchedule ?? '',
+  });
 });
 
 // Batch F: Telemetry Ingestion

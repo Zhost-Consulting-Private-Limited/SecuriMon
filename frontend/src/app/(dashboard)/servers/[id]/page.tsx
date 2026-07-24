@@ -61,6 +61,8 @@ interface ApplicationRow {
 interface ServerConfig {
   fimWatchPaths: string[];
   logSources: string[];
+  metricsIntervalSeconds: number;
+  scanSchedule: string;
 }
 
 interface AISuggestion {
@@ -85,6 +87,8 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const [config, setConfig] = useState<ServerConfig | null>(null);
   const [fimPathsText, setFimPathsText] = useState("");
   const [logSourcesText, setLogSourcesText] = useState("");
+  const [metricsIntervalSeconds, setMetricsIntervalSeconds] = useState(0);
+  const [scanSchedule, setScanSchedule] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
   const [error, setError] = useState("");
   const [rescanning, setRescanning] = useState(false);
@@ -117,6 +121,8 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
           setConfig(cfg);
           setFimPathsText((cfg.fimWatchPaths ?? []).join("\n"));
           setLogSourcesText((cfg.logSources ?? []).join("\n"));
+          setMetricsIntervalSeconds(cfg.metricsIntervalSeconds ?? 0);
+          setScanSchedule(cfg.scanSchedule ?? "");
         })
         .catch((e) => setError(describe(e)));
     }
@@ -135,7 +141,11 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
     try {
-      const updated = await api.put<ServerConfig>(`/v1/servers/${id}/config`, { fimWatchPaths, logSources }, token);
+      const updated = await api.put<ServerConfig>(
+        `/v1/servers/${id}/config`,
+        { fimWatchPaths, logSources, metricsIntervalSeconds, scanSchedule },
+        token
+      );
       setConfig(updated);
     } catch (e) {
       setError(describe(e));
@@ -428,6 +438,38 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
                 placeholder={"/var/log/nginx/*.log\n/var/log/myapp/app.log"}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
               />
+
+              <div className="pt-2">
+                <h2 className="text-lg font-medium text-gray-900">Telemetry interval</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Seconds between telemetry pushes. Leave at 0 to use the default (60s). Takes effect within about an
+                  hour, on the agent&apos;s next scheduled scan.
+                </p>
+              </div>
+              <input
+                type="number"
+                min={0}
+                value={metricsIntervalSeconds}
+                onChange={(e) => setMetricsIntervalSeconds(Number(e.target.value))}
+                placeholder="60"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
+
+              <div className="pt-2">
+                <h2 className="text-lg font-medium text-gray-900">Security scan schedule</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  How often the agent runs its full security scan.
+                </p>
+              </div>
+              <select
+                value={scanSchedule}
+                onChange={(e) => setScanSchedule(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">Default (hourly)</option>
+                <option value="hourly">Hourly</option>
+                <option value="daily">Daily</option>
+              </select>
 
               <button
                 onClick={handleSaveConfig}

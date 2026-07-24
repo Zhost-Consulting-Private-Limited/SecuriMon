@@ -8,14 +8,17 @@ import (
 )
 
 type remoteConfigResponse struct {
-	FIMWatchPaths []string `json:"fim_watch_paths"`
-	LogSources    []string `json:"log_sources"`
+	FIMWatchPaths          []string `json:"fim_watch_paths"`
+	LogSources             []string `json:"log_sources"`
+	MetricsIntervalSeconds int      `json:"metrics_interval_seconds"`
+	ScanSchedule           string   `json:"scan_schedule"`
 }
 
-// fetchRemoteConfig polls the backend for dashboard-set configuration - FIM watch paths
-// and log sources to tail - the "config channel" AGENT_SPEC.md has always described
-// (dashboard -> backend -> agent), which previously existed only as documentation with
-// no code behind it until Batch E (FIM paths) and Batch K (log sources).
+// fetchRemoteConfig polls the backend for dashboard-set configuration - FIM watch paths,
+// log sources to tail, telemetry interval, and scan schedule - the "config channel"
+// AGENT_SPEC.md has always described (dashboard -> backend -> agent), which previously
+// existed only as documentation with no code behind it until Batch E (FIM paths), Batch K
+// (log sources), and Batch L (telemetry interval / scan schedule).
 func fetchRemoteConfig(backendURL, serverID, apiKey string) (*remoteConfigResponse, error) {
 	url := fmt.Sprintf("%s/v1/agent/%s/config", backendURL, serverID)
 	resp, err := makeHTTPRequest("GET", url, apiKey, nil)
@@ -72,12 +75,16 @@ func SyncRemoteConfig(config *Config, configPath string) {
 
 	fimMerged, fimChanged := mergeRemoteStringList(config.FIMWatchPaths, remote.FIMWatchPaths)
 	logSourcesMerged, logSourcesChanged := mergeRemoteStringList(config.LogSources, remote.LogSources)
-	if !fimChanged && !logSourcesChanged {
+	metricsChanged := config.MetricsIntervalSeconds != remote.MetricsIntervalSeconds
+	scanScheduleChanged := config.ScanSchedule != remote.ScanSchedule
+	if !fimChanged && !logSourcesChanged && !metricsChanged && !scanScheduleChanged {
 		return
 	}
 
 	config.FIMWatchPaths = fimMerged
 	config.LogSources = logSourcesMerged
+	config.MetricsIntervalSeconds = remote.MetricsIntervalSeconds
+	config.ScanSchedule = remote.ScanSchedule
 	if err := SaveConfig(configPath, config); err != nil {
 		log.Printf("Config sync: failed to save updated config: %v", err)
 		return
@@ -87,5 +94,11 @@ func SyncRemoteConfig(config *Config, configPath string) {
 	}
 	if logSourcesChanged {
 		log.Printf("Config sync: updated log sources from dashboard (%d sources)", len(logSourcesMerged))
+	}
+	if metricsChanged {
+		log.Printf("Config sync: updated telemetry interval from dashboard (%d seconds)", remote.MetricsIntervalSeconds)
+	}
+	if scanScheduleChanged {
+		log.Printf("Config sync: updated scan schedule from dashboard (%q)", remote.ScanSchedule)
 	}
 }

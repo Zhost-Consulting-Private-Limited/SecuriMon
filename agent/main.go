@@ -69,21 +69,29 @@ func main() {
 	// Start WebSocket listener in a background goroutine
 	go ConnectWebSocket(config)
 
-	// Main execution loop (Heartbeat / Telemetry)
-	ticker := time.NewTicker(60 * time.Second)
-	scanTicker := time.NewTicker(1 * time.Hour)  // Run security scan hourly
-	appTicker := time.NewTicker(5 * time.Minute) // Refresh application inventory
-	defer ticker.Stop()
-	defer scanTicker.Stop()
-	defer appTicker.Stop()
-
 	log.Println("Agent initialized and entering main loop...")
 
 	// Sync dashboard-set config (e.g. FIM watch paths) synchronously before anything
 	// reads config.FIMWatchPaths from another goroutine, to avoid a data race on the
-	// shared *Config - see SyncRemoteConfig in remoteconfig.go.
+	// shared *Config - see SyncRemoteConfig in remoteconfig.go. Runs before the tickers
+	// are created so a dashboard-set telemetry interval/scan schedule applies from the
+	// very first tick, not just after the first hourly sync.
 	SyncRemoteConfig(config, configPath)
 	StartLogWatchers(config)
+
+	// Main execution loop (Heartbeat / Telemetry). Telemetry and scan cadence are
+	// dashboard-configurable (see schedule.go) - currentTelemetryInterval/
+	// currentScanInterval track what's currently applied so the scanTicker case below
+	// can detect a change and swap in a new ticker (time.Ticker's interval can't be
+	// changed in place once created).
+	currentTelemetryInterval := telemetryInterval(config)
+	currentScanInterval := scanInterval(config)
+	ticker := time.NewTicker(currentTelemetryInterval)
+	scanTicker := time.NewTicker(currentScanInterval)
+	appTicker := time.NewTicker(5 * time.Minute) // Refresh application inventory
+	defer ticker.Stop()
+	defer scanTicker.Stop()
+	defer appTicker.Stop()
 
 	// Run initial security scan, application discovery, and drift baseline
 	go runAndPushScan(config)
@@ -112,6 +120,20 @@ func main() {
 		case <-scanTicker.C:
 			SyncRemoteConfig(config, configPath) // synchronous - see comment above
 			StartLogWatchers(config)             // picks up any newly dashboard-added sources
+
+			if newInterval := telemetryInterval(config); newInterval != currentTelemetryInterval {
+				ticker.Stop()
+				ticker = time.NewTicker(newInterval)
+				currentTelemetryInterval = newInterval
+				log.Printf("Config sync: telemetry cadence now every %v", newInterval)
+			}
+			if newInterval := scanInterval(config); newInterval != currentScanInterval {
+				scanTicker.Stop()
+				scanTicker = time.NewTicker(newInterval)
+				currentScanInterval = newInterval
+				log.Printf("Config sync: scan cadence now every %v", newInterval)
+			}
+
 			go runAndPushScan(config)
 			go RunDriftDetection(config)
 		case <-appTicker.C:

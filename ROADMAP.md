@@ -143,6 +143,15 @@ Returns to the main feature roadmap after the H/I/J production-readiness detour.
 - **Verified with a real compiled agent against a real tailed file**: appended a routine line and an `ERROR: disk full` line to a temp log file the agent was configured (via the dashboard) to tail; confirmed only the ERROR line produced a `TimelineEvent`, confirmed the daily digest then reported a non-zero error count sourced from that real event (the first time ever, since nothing previously fed that code path), and confirmed no `ThreatEvent` was created by the log line.
 - Explicitly deferred: `metrics_interval_seconds`/`scan_schedule` (needs live `time.Ticker` reconfiguration in `main.go`, separate work); `auto_remediation` flags are intentionally never added here at all - duplicating Phase 2 Batch 1's real `RemediationPolicy` system would create two competing sources of truth. Removing a log source from the dashboard doesn't stop an already-running tailer until the agent restarts.
 
+## Phase 3 Batch L (complete — see `handoff.md` for exact verification level)
+
+Closes out the config channel work: `metrics_interval_seconds`/`scan_schedule` (the two fields Batch K explicitly deferred) are now dashboard-configurable. After this batch, every `AGENT_SPEC.md` config-channel field except `auto_remediation` (intentionally excluded, see Batch K) is wired through.
+
+- ✅ New `agent/schedule.go` (`telemetryInterval()`/`scanInterval()`, pure and tested) plus `Config.MetricsIntervalSeconds`/`ScanSchedule` synced via the existing config channel. `agent/main.go`'s telemetry/scan tickers are now built from these computed durations and live-swapped (old ticker `.Stop()`'d, new one created) inside the existing `scanTicker.C` case whenever a synced value changes - Go's `select` picks up the replacement on the very next loop iteration. **7 new agent tests.**
+- ✅ Backend `desiredConfig` extended to `{ fimWatchPaths, logSources, metricsIntervalSeconds, scanSchedule }` with range/enum validation. **7 new backend tests** - the first dedicated tests for these config endpoints. Frontend Configuration tab gained a number input and a schedule dropdown.
+- **Verified two ways**: (1) the exact `Stop()`+`NewTicker()` reassignment mechanism was proven in isolation with a short-interval throwaway program (ticks measurably changed cadence the instant after the swap); (2) a real compiled agent, given a dashboard-set `metricsIntervalSeconds: 10` before its (re)start, logged picking up the value and then pushed telemetry at real ~10-second intervals instead of the 60s default.
+- Honest gap: the *live mid-run* swap specifically wasn't observed end-to-end on a real agent across a full hourly `scanTicker` cycle in this session (impractical to wait out) - covered by the isolated mechanism proof and code review instead.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation — the **propose** half now exists (Batch G, above); the **execute** half (AI proposes and, with approval or configured trust level, executes fixes automatically) still needs its own approval workflow and trust-level infrastructure and is deliberately deferred
 - Self-Healing Infrastructure (broader automated recovery playbooks)
@@ -150,7 +159,6 @@ Returns to the main feature roadmap after the H/I/J production-readiness detour.
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
 - Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
-- Expanding the config channel to cover `metrics_interval_seconds`/`scan_schedule` (FIM watch paths and log sources are wired through as of Batches E and K; `auto_remediation` flags are intentionally excluded — already handled by Phase 2 Batch 1's `RemediationPolicy` system) — needs live Go `time.Ticker` reconfiguration in `agent/main.go`'s hot loop
 
 ## Phase 4
 - Endpoint Detection & Response (EDR)

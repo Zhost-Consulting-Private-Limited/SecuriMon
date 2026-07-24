@@ -257,34 +257,61 @@ router.post('/:serverId/rescan', authenticate, async (req: AuthRequest, res: Res
   }
 });
 
-// Dashboard-facing agent configuration (e.g. FIM watch paths, log sources to tail - see
-// AGENT_SPEC.md's "config channel"). Stored as JSON on Server.desiredConfig; the agent
-// polls GET /v1/agent/:serverId/config (routes/agent.ts) to pick up changes.
+const MIN_METRICS_INTERVAL_SECONDS = 10;
+const MAX_METRICS_INTERVAL_SECONDS = 3600;
+const VALID_SCAN_SCHEDULES = ['hourly', 'daily'];
+
+// Dashboard-facing agent configuration (e.g. FIM watch paths, log sources to tail,
+// telemetry interval, scan schedule - see AGENT_SPEC.md's "config channel"). Stored as
+// JSON on Server.desiredConfig; the agent polls GET /v1/agent/:serverId/config
+// (routes/agent.ts) to pick up changes.
 router.get('/:serverId/config', authenticate, async (req: AuthRequest, res: Response) => {
   const server = await loadOwnedServer(req, res);
   if (!server) return;
 
   const fullServer = await prisma.server.findUnique({ where: { id: server.id }, select: { desiredConfig: true } });
   const stored = fullServer?.desiredConfig ? JSON.parse(fullServer.desiredConfig) : {};
-  // Defaults fill in keys older saved configs (pre-Batch K) won't have yet.
-  res.json({ fimWatchPaths: stored.fimWatchPaths ?? [], logSources: stored.logSources ?? [] });
+  // Defaults fill in keys older saved configs (pre-Batch K/L) won't have yet. 0/"" tell
+  // the agent to use its own built-in defaults (60s telemetry, hourly scans).
+  res.json({
+    fimWatchPaths: stored.fimWatchPaths ?? [],
+    logSources: stored.logSources ?? [],
+    metricsIntervalSeconds: stored.metricsIntervalSeconds ?? 0,
+    scanSchedule: stored.scanSchedule ?? '',
+  });
 });
 
 router.put('/:serverId/config', authenticate, async (req: AuthRequest, res: Response) => {
   const server = await loadOwnedServer(req, res);
   if (!server) return;
 
-  const { fimWatchPaths, logSources } = req.body;
+  const { fimWatchPaths, logSources, metricsIntervalSeconds, scanSchedule } = req.body;
   if (fimWatchPaths !== undefined && !Array.isArray(fimWatchPaths)) {
     return res.status(400).json({ error: 'fimWatchPaths must be an array of strings' });
   }
   if (logSources !== undefined && !Array.isArray(logSources)) {
     return res.status(400).json({ error: 'logSources must be an array of strings' });
   }
+  if (
+    metricsIntervalSeconds !== undefined &&
+    metricsIntervalSeconds !== 0 &&
+    (!Number.isInteger(metricsIntervalSeconds) ||
+      metricsIntervalSeconds < MIN_METRICS_INTERVAL_SECONDS ||
+      metricsIntervalSeconds > MAX_METRICS_INTERVAL_SECONDS)
+  ) {
+    return res.status(400).json({
+      error: `metricsIntervalSeconds must be 0 (use default) or an integer between ${MIN_METRICS_INTERVAL_SECONDS} and ${MAX_METRICS_INTERVAL_SECONDS}`,
+    });
+  }
+  if (scanSchedule !== undefined && scanSchedule !== '' && !VALID_SCAN_SCHEDULES.includes(scanSchedule)) {
+    return res.status(400).json({ error: `scanSchedule must be one of: ${VALID_SCAN_SCHEDULES.join(', ')}` });
+  }
 
   const config = {
     fimWatchPaths: Array.isArray(fimWatchPaths) ? fimWatchPaths.filter((p) => typeof p === 'string') : [],
     logSources: Array.isArray(logSources) ? logSources.filter((p) => typeof p === 'string') : [],
+    metricsIntervalSeconds: typeof metricsIntervalSeconds === 'number' ? metricsIntervalSeconds : 0,
+    scanSchedule: typeof scanSchedule === 'string' ? scanSchedule : '',
   };
 
   await prisma.server.update({

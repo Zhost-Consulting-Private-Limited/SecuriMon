@@ -125,6 +125,16 @@ Follows directly from Batch H: hardening auth/tenant-isolation by hand-verificat
 - ✅ CI: added a test step to the existing `build-backend` job in `.github/workflows/agent-builder.yml` (there was no separate backend test workflow to begin with).
 - Explicitly not covered by this batch: alerts, billing, remediation, AI routes, WebSocket agent comms, MSP tenant management, compliance reports (backend), and the entire frontend all remain untested by automation - stated as a deliberately narrow start, not general coverage.
 
+## Phase 3 Batch J (complete — see `handoff.md` for exact verification level)
+
+Closes the last item in the Batch H/I production-readiness thread: this project used `prisma db push` since day one with zero migration history across 20 schema models and 9 merged PRs.
+
+- ✅ Baselined the schema via Prisma's official workflow: generated `prisma/migrations/20260724130948_init/migration.sql` from an empty→schema diff (21 `CREATE TABLE` statements, matching all 21 models), then marked it applied against the real `dev.db` via `migrate resolve --applied` - without executing the SQL or touching existing data (verified via before/after row-count snapshots).
+- **Proved the migration SQL is complete, not just plausible**: applied it to a brand-new empty SQLite file via `migrate deploy`, then diffed that database against `schema.prisma` directly - result was `-- This is an empty migration.` (zero drift), the strongest available proof it correctly bootstraps a fresh environment.
+- ✅ New `migrate:dev`/`migrate:deploy` npm scripts; `DEPLOYMENT.md` updated to run `prisma migrate deploy` instead of `db push` for both install and upgrade, with the forward workflow for adding new migrations documented.
+- Deliberately unchanged: the test suite's disposable database still uses `db push --force-reset` - the right tool for a throwaway DB with no data to protect, not an inconsistency.
+- Honest caveat: a fresh single-migration baseline, not deep history; the generated SQL is SQLite-specific, so a SaaS operator moving to PostgreSQL (per `schema.prisma`'s existing "change provider for production" comment) will need to regenerate migration history for that provider - a pre-existing fact about this schema, not a new gap from this batch.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation — the **propose** half now exists (Batch G, above); the **execute** half (AI proposes and, with approval or configured trust level, executes fixes automatically) still needs its own approval workflow and trust-level infrastructure and is deliberately deferred
 - Self-Healing Infrastructure (broader automated recovery playbooks)

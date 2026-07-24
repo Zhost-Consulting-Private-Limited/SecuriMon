@@ -82,6 +82,29 @@ jobs:
           echo "backend_needs_build=$backend_changes" >> $GITHUB_OUTPUT
           echo "frontend_needs_build=$frontend_changes" >> $GITHUB_OUTPUT
 
+  test-agent:
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.agent == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Run Agent Tests
+        run: |
+          cd agent
+          go vet ./...
+          go test ./... -v
+
   build-agent-linux-musl:
     needs: analyze-changes
     if: needs.analyze-changes.outputs.agent == 'true'
@@ -341,7 +364,7 @@ jobs:
           echo "Build status: SUCCESS" >> $GITHUB_STEP_SUMMARY
 
   summary:
-    needs: [build-agent-linux-musl, build-agent-windows-musl, build-backend, build-frontend]
+    needs: [test-agent, build-agent-linux-musl, build-agent-windows-musl, build-backend, build-frontend]
     if: always()
     runs-on: ubuntu-latest
     steps:

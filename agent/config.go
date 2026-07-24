@@ -11,6 +11,10 @@ type Config struct {
 	ServerID   string `json:"server_id"`
 	APIKey     string `json:"api_key"`
 	BackendURL string `json:"backend_url"`
+	// FIMWatchPaths, if set, overrides the default File Integrity Monitoring watch
+	// list (see drift.go). Left empty by default - the agent falls back to common
+	// web-server config paths that actually exist on the host.
+	FIMWatchPaths []string `json:"fim_watch_paths,omitempty"`
 }
 
 // LoadConfig reads and parses the JSON configuration file

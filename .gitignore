@@ -21,6 +21,10 @@ agent/obj/
 *.test
 *.out
 
+# *.test above is meant for Go's compiled test binaries, but it also matches
+# backend/.env.test (a committed fixture with no real secrets) - explicitly un-ignore it.
+!backend/.env.test
+
 # IDEs and OS
 .vscode/
 .idea/

@@ -115,6 +115,16 @@ Prompted directly by the user asking for production-readiness and "best security
 - Reviewed and accepted, not changed: agent API-key auth (already hash+DB-lookup based, no timing-attack surface); frontend `npm audit`'s `postcss`/`sharp` findings (transitive to Next's bundled build tooling; the suggested fix downgrades `next` 16→9, a nonsensical breaking change for build-time-only advisories).
 - Explicitly deferred: JWT-in-`localStorage` (vs. an `httpOnly` cookie) is a known further hardening step, not attempted this batch to avoid risking the working login flow.
 
+## Phase 3 Batch I (complete — see `handoff.md` for exact verification level)
+
+Follows directly from Batch H: hardening auth/tenant-isolation by hand-verification is real, but leaves nothing behind to catch a future regression. Adds the backend's first automated test suite, deliberately scoped to the highest-value security surface rather than backfilling everything at once:
+
+- ✅ New `vitest`+`supertest` test harness (`backend/vitest.config.ts`, `backend/tests/`, a committed `.env.test` fixture with no real secrets, an isolated `test.db`) — `backend/src/index.ts` was split into `src/app.ts` (the Express app, exported, importable without a real `.listen()`) and a thin entrypoint, so tests can exercise the real app via `supertest`.
+- ✅ 16 tests across 4 files: `utils/jwt.ts` (sign/verify round-trip, tampered/expired-token rejection, fail-fast-on-missing-secret - now automated instead of only manually checked in Batch H), `middlewares/auth.ts`, `routes/auth.ts` (register/login flows, password policy, duplicate email), and cross-tenant server isolation (`loadOwnedServer()`).
+- **Proven, not just written**: the tenant-isolation test was confirmed to actually fail when the tenant filter was temporarily removed from `loadOwnedServer()`, then pass again once restored - a real red/green check.
+- ✅ CI: added a test step to the existing `build-backend` job in `.github/workflows/agent-builder.yml` (there was no separate backend test workflow to begin with).
+- Explicitly not covered by this batch: alerts, billing, remediation, AI routes, WebSocket agent comms, MSP tenant management, compliance reports (backend), and the entire frontend all remain untested by automation - stated as a deliberately narrow start, not general coverage.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation — the **propose** half now exists (Batch G, above); the **execute** half (AI proposes and, with approval or configured trust level, executes fixes automatically) still needs its own approval workflow and trust-level infrastructure and is deliberately deferred
 - Self-Healing Infrastructure (broader automated recovery playbooks)

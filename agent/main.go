@@ -107,6 +107,7 @@ func main() {
 			}
 
 			go ScanForCryptoMiners(config)
+			go ScanForPortScans(config)
 		case <-scanTicker.C:
 			SyncRemoteConfig(config, configPath) // synchronous - see comment above
 			go runAndPushScan(config)

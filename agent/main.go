@@ -79,6 +79,11 @@ func main() {
 
 	log.Println("Agent initialized and entering main loop...")
 
+	// Sync dashboard-set config (e.g. FIM watch paths) synchronously before anything
+	// reads config.FIMWatchPaths from another goroutine, to avoid a data race on the
+	// shared *Config - see SyncRemoteConfig in remoteconfig.go.
+	SyncRemoteConfig(config, configPath)
+
 	// Run initial security scan, application discovery, and drift baseline
 	go runAndPushScan(config)
 	go runAndPushApplications(config)
@@ -103,6 +108,7 @@ func main() {
 
 			go ScanForCryptoMiners(config)
 		case <-scanTicker.C:
+			SyncRemoteConfig(config, configPath) // synchronous - see comment above
 			go runAndPushScan(config)
 			go RunDriftDetection(config)
 		case <-appTicker.C:

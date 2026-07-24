@@ -90,6 +90,14 @@ router.post('/register', async (req: Request, res: Response) => {
   });
 });
 
+// Agent-facing config poll (see routes/server.ts PUT /:serverId/config for the
+// dashboard-facing side). Returns whatever the dashboard has set, or empty defaults.
+router.get('/:serverId/config', authenticateAgent, async (req: AgentRequest, res: Response) => {
+  const server = await prisma.server.findUnique({ where: { id: req.server.id }, select: { desiredConfig: true } });
+  const config = server?.desiredConfig ? JSON.parse(server.desiredConfig) : { fimWatchPaths: [] };
+  res.json({ fim_watch_paths: config.fimWatchPaths ?? [] });
+});
+
 // Batch F: Telemetry Ingestion
 router.post('/:serverId/telemetry', authenticateAgent, async (req: AgentRequest, res: Response) => {
   const serverId = req.server.id;

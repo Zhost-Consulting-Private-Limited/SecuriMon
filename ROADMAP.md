@@ -82,7 +82,14 @@ Working overnight (2026-07-24) through Phase 3 items that don't need cloud/clust
 
 - ✅ Patch Management, **detection-only** (scheduled/tested auto-patching remains future work — see below) — new `agent/patches.go`: detects whichever package manager exists (`apt`/`dnf`/`yum`), counts upgradable packages, flags security updates (heuristic for apt via `-security` repo suffix; native `--security` filter for dnf/yum). Reports via the existing findings pipeline. **Verified with 6 new automated tests** (19 agent tests total now) covering the output-parsing logic against realistic fixtures, plus a real finding round-trip through the ingestion/risk-scoring pipeline. The `apt`/`yum`/`dnf` command-invocation branches themselves have not run against a real package manager (no Linux/RHEL-family host this session) — only their parsing logic is tested.
 
-This is the planned stopping point for tonight's standing autonomous-work plan — all four queued batches (A-D) are done. See `handoff.md` "Current Status" for the exact PR/merge state of each.
+## Phase 3 Batch E (complete — see `handoff.md` for exact verification level)
+
+Closes two gaps explicitly flagged in Batches A-D rather than left silently inconsistent:
+
+- ✅ Firewalld-aware `block_ip` — the security scanner detected `firewalld` since Phase 1.5, but the `block_ip` remediation action stayed `ufw`-only until now. `agent/remediation.go` detects the right tool and uses `firewall-cmd`'s rich-rule syntax on RHEL-family hosts, with the IP validated via `net.ParseIP` first (a malformed "IP" could otherwise break out of the rich-rule string, since `firewall-cmd` parses its own grammar). **4 new tests**, can't exercise a real `firewall-cmd` without a RHEL-family host this session.
+- ✅ Dashboard-configurable FIM watch paths — implements the "config channel" `AGENT_SPEC.md` has always described (dashboard → backend → agent) for the first time, using it to carry FIM watch paths. New `Server.desiredConfig` column, `PUT`/`GET /v1/servers/:id/config`, agent-facing `GET /v1/agent/:serverId/config`, a new Configuration tab on the server detail page, and `agent/remoteconfig.go` polling it on startup and every hourly scan tick. **Verified with the strongest technique used all night**: a real agent process, restarted after the dashboard set new paths, logged picking them up and persisted them to its own local config file — the full loop, not a backend-only round-trip.
+
+This was the planned stopping point after tonight's original four batches (A-D); Batch E addresses two of the gaps they left behind. See `handoff.md` "Current Status" for the exact PR/merge state.
 
 ## Phase 3 (remaining)
 - AI Auto-Remediation (AI proposes and, with approval or configured trust level, executes fixes)
@@ -91,8 +98,8 @@ This is the planned stopping point for tonight's standing autonomous-work plan �
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
 - Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
-- Dashboard UI for configuring per-server FIM watch paths (Batch C added the agent-side mechanism only)
 - Port scan detection (Phase 1 MVP's original Threat Detection promise, still outstanding after Batch A — see Phase 3 Batch A above)
+- Expanding the Batch E config channel to cover the rest of `AGENT_SPEC.md`'s documented fields (`metrics_interval_seconds`, `scan_schedule`, `auto_remediation` flags, `log_sources`) — only FIM watch paths are wired through it so far
 
 ## Phase 4
 - Endpoint Detection & Response (EDR)

@@ -63,6 +63,7 @@ model Server {
   region        String?
   customerLabel String?
   tags          String? // Array stored as JSON string
+  desiredConfig String? // Dashboard-set agent config (e.g. FIM watch paths), stored as JSON string; polled by the agent
   apiKeyHash    String
   agentVersion  String?
   lastSeenAt    DateTime?

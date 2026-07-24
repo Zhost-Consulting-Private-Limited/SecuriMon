@@ -3,9 +3,40 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"os/exec"
 	"runtime"
+	"strings"
 )
+
+// buildBlockIPCommands returns the sequence of command argv slices needed to block a
+// source IP with the given firewall tool ("ufw" or "firewalld"; any other value, or an
+// unparseable IP, returns no commands). Pure and side-effect-free so it can be unit
+// tested without a real firewall present - the same pattern used for patches.go's
+// output parsers.
+//
+// The IP is validated with net.ParseIP before being embedded in firewalld's rich-rule
+// string: that string isn't passed through a shell (exec.Command doesn't invoke one),
+// but firewalld parses its own rule syntax, so an attacker-controlled "IP" containing
+// quotes could otherwise break out of the intended rule (e.g. turn a reject into an
+// accept, or target a different address than the one that was actually detected).
+func buildBlockIPCommands(tool string, ip string) [][]string {
+	if net.ParseIP(ip) == nil {
+		return nil
+	}
+
+	switch tool {
+	case "ufw":
+		return [][]string{{"ufw", "deny", "from", ip}}
+	case "firewalld":
+		return [][]string{
+			{"firewall-cmd", "--permanent", `--add-rich-rule=rule family="ipv4" source address="` + ip + `" reject`},
+			{"firewall-cmd", "--reload"},
+		}
+	default:
+		return nil
+	}
+}
 
 // ExecuteRemediation securely executes a whitelisted remediation action
 func ExecuteRemediation(action string, params map[string]interface{}) (string, error) {
@@ -49,11 +80,28 @@ func ExecuteRemediation(action string, params map[string]interface{}) (string, e
 		if !ok {
 			return "failed", nil
 		}
-		out, err := exec.Command("ufw", "deny", "from", ip).CombinedOutput()
-		if err != nil {
-			return "failed", err
+
+		tool := "none"
+		if _, err := exec.LookPath("ufw"); err == nil {
+			tool = "ufw"
+		} else if _, err := exec.LookPath("firewall-cmd"); err == nil {
+			tool = "firewalld"
 		}
-		return string(out), nil
+
+		commands := buildBlockIPCommands(tool, ip)
+		if len(commands) == 0 {
+			return "failed", fmt.Errorf("could not build a block command: either no supported firewall tool (ufw or firewalld) was found, or the IP %q didn't parse as valid", ip)
+		}
+
+		var combinedOutput strings.Builder
+		for _, args := range commands {
+			out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+			combinedOutput.Write(out)
+			if err != nil {
+				return combinedOutput.String(), err
+			}
+		}
+		return combinedOutput.String(), nil
 
 	default:
 		log.Printf("Unknown or disallowed remediation action: %s", action)

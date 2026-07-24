@@ -83,6 +83,7 @@ func main() {
 	// reads config.FIMWatchPaths from another goroutine, to avoid a data race on the
 	// shared *Config - see SyncRemoteConfig in remoteconfig.go.
 	SyncRemoteConfig(config, configPath)
+	StartLogWatchers(config)
 
 	// Run initial security scan, application discovery, and drift baseline
 	go runAndPushScan(config)
@@ -110,6 +111,7 @@ func main() {
 			go ScanForPortScans(config)
 		case <-scanTicker.C:
 			SyncRemoteConfig(config, configPath) // synchronous - see comment above
+			StartLogWatchers(config)             // picks up any newly dashboard-added sources
 			go runAndPushScan(config)
 			go RunDriftDetection(config)
 		case <-appTicker.C:

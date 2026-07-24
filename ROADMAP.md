@@ -135,6 +135,14 @@ Closes the last item in the Batch H/I production-readiness thread: this project 
 - Deliberately unchanged: the test suite's disposable database still uses `db push --force-reset` - the right tool for a throwaway DB with no data to protect, not an inconsistency.
 - Honest caveat: a fresh single-migration baseline, not deep history; the generated SQL is SQLite-specific, so a SaaS operator moving to PostgreSQL (per `schema.prisma`'s existing "change provider for production" comment) will need to regenerate migration history for that provider - a pre-existing fact about this schema, not a new gap from this batch.
 
+## Phase 3 Batch K (complete — see `handoff.md` for exact verification level)
+
+Returns to the main feature roadmap after the H/I/J production-readiness detour. Closes the `log_sources` part of "expanding the Batch E config channel" - and along the way discovered that `services/ai/logdigest.ts`'s digest generator has branched on ERROR/WARNING-category `TimelineEvent`s since Phase 1.5 with nothing ever producing one in that shape, so this also completes a real gap in the existing Log Intelligence feature, not just a new standalone capability.
+
+- ✅ New `agent/logwatch.go`: cross-platform generic log tailing (glob-expanding configured sources, classifying lines as ERROR/WARNING/skip via a keyword heuristic), reusing the existing config-channel merge logic from Batch E (`agent/remoteconfig.go`, generalized and renamed `mergeRemoteStringList`). New `POST /v1/agent/:serverId/log-events` creates only a `TimelineEvent` - deliberately kept separate from the threat-events endpoint so generic log noise can never trigger auto-remediation. Configuration tab gained a second "Log sources to tail" textarea. **7 new agent tests, 4 new backend tests.**
+- **Verified with a real compiled agent against a real tailed file**: appended a routine line and an `ERROR: disk full` line to a temp log file the agent was configured (via the dashboard) to tail; confirmed only the ERROR line produced a `TimelineEvent`, confirmed the daily digest then reported a non-zero error count sourced from that real event (the first time ever, since nothing previously fed that code path), and confirmed no `ThreatEvent` was created by the log line.
+- Explicitly deferred: `metrics_interval_seconds`/`scan_schedule` (needs live `time.Ticker` reconfiguration in `main.go`, separate work); `auto_remediation` flags are intentionally never added here at all - duplicating Phase 2 Batch 1's real `RemediationPolicy` system would create two competing sources of truth. Removing a log source from the dashboard doesn't stop an already-running tailer until the agent restarts.
+
 ## Phase 3 (remaining)
 - AI Auto-Remediation — the **propose** half now exists (Batch G, above); the **execute** half (AI proposes and, with approval or configured trust level, executes fixes automatically) still needs its own approval workflow and trust-level infrastructure and is deliberately deferred
 - Self-Healing Infrastructure (broader automated recovery playbooks)
@@ -142,7 +150,7 @@ Closes the last item in the Batch H/I production-readiness thread: this project 
 - Vulnerability Scanner (deeper CVE correlation, not just version-check)
 - Malware Detection (signature + behavioral) — crypto-miner detection (Batch A) is a first slice of this
 - Cloud Security Posture Management (CSPM)
-- Expanding the Batch E config channel to cover the rest of `AGENT_SPEC.md`'s documented fields (`metrics_interval_seconds`, `scan_schedule`, `auto_remediation` flags, `log_sources`) — only FIM watch paths are wired through it so far
+- Expanding the config channel to cover `metrics_interval_seconds`/`scan_schedule` (FIM watch paths and log sources are wired through as of Batches E and K; `auto_remediation` flags are intentionally excluded — already handled by Phase 2 Batch 1's `RemediationPolicy` system) — needs live Go `time.Ticker` reconfiguration in `agent/main.go`'s hot loop
 
 ## Phase 4
 - Endpoint Detection & Response (EDR)

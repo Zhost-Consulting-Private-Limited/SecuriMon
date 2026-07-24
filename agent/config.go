@@ -15,6 +15,10 @@ type Config struct {
 	// list (see drift.go). Left empty by default - the agent falls back to common
 	// web-server config paths that actually exist on the host.
 	FIMWatchPaths []string `json:"fim_watch_paths,omitempty"`
+	// LogSources, if set, is a list of file paths/globs (e.g. "/var/log/nginx/*.log")
+	// the agent tails for generic ERROR/WARNING lines (see logwatch.go). Dashboard-set,
+	// delivered via the same config channel as FIMWatchPaths.
+	LogSources []string `json:"log_sources,omitempty"`
 }
 
 // LoadConfig reads and parses the JSON configuration file

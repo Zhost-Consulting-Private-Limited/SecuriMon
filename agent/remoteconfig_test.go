@@ -6,7 +6,7 @@ func TestMergeRemoteFIMPathsNoChange(t *testing.T) {
 	current := []string{"/etc/nginx/nginx.conf"}
 	remote := []string{"/etc/nginx/nginx.conf"}
 
-	merged, changed := mergeRemoteFIMPaths(current, remote)
+	merged, changed := mergeRemoteStringList(current, remote)
 	if changed {
 		t.Fatalf("expected no change for identical paths, got changed=%v merged=%+v", changed, merged)
 	}
@@ -16,7 +16,7 @@ func TestMergeRemoteFIMPathsDetectsChange(t *testing.T) {
 	current := []string{"/etc/nginx/nginx.conf"}
 	remote := []string{"/etc/nginx/nginx.conf", "/etc/apache2/apache2.conf"}
 
-	merged, changed := mergeRemoteFIMPaths(current, remote)
+	merged, changed := mergeRemoteStringList(current, remote)
 	if !changed {
 		t.Fatalf("expected a change when the dashboard adds a path")
 	}
@@ -26,7 +26,7 @@ func TestMergeRemoteFIMPathsDetectsChange(t *testing.T) {
 }
 
 func TestMergeRemoteFIMPathsBothEmpty(t *testing.T) {
-	merged, changed := mergeRemoteFIMPaths(nil, []string{})
+	merged, changed := mergeRemoteStringList(nil, []string{})
 	if changed {
 		t.Fatalf("expected no change when both current and remote are empty, got merged=%+v", merged)
 	}
@@ -36,7 +36,7 @@ func TestMergeRemoteFIMPathsDashboardClearsCustomList(t *testing.T) {
 	current := []string{"/etc/nginx/nginx.conf"}
 	remote := []string{}
 
-	merged, changed := mergeRemoteFIMPaths(current, remote)
+	merged, changed := mergeRemoteStringList(current, remote)
 	if !changed {
 		t.Fatalf("expected a change when the dashboard clears a previously-set list")
 	}

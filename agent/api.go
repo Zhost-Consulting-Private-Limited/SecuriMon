@@ -37,6 +37,15 @@ type ThreatEvent struct {
 	OccurredAt string `json:"occurred_at"` // ISO8601 string
 }
 
+// LogEvent is a single classified line from a dashboard-configured log source (see
+// logwatch.go). Deliberately separate from ThreatEvent - this is generic app-log noise,
+// not a security detection, and should never trigger auto-remediation.
+type LogEvent struct {
+	Source  string `json:"source"`
+	Level   string `json:"level"` // "ERROR" | "WARNING"
+	Message string `json:"message"`
+}
+
 type ApplicationService struct {
 	Name         string    `json:"name"`
 	Status       string    `json:"status"` // "running", "stopped", "failed", "unknown"
@@ -136,6 +145,24 @@ func SendThreatEvent(backendURL, serverID, apiKey string, event *ThreatEvent) er
 	if resp.StatusCode != 202 && resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("threat event push failed [%d]: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func SendLogEvent(backendURL, serverID, apiKey string, event *LogEvent) error {
+	data, _ := json.Marshal(event)
+	url := fmt.Sprintf("%s/v1/agent/%s/log-events", backendURL, serverID)
+
+	resp, err := makeHTTPRequest("POST", url, apiKey, data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 202 && resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("log event push failed [%d]: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

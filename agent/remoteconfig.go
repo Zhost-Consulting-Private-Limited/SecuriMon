@@ -9,12 +9,13 @@ import (
 
 type remoteConfigResponse struct {
 	FIMWatchPaths []string `json:"fim_watch_paths"`
+	LogSources    []string `json:"log_sources"`
 }
 
-// fetchRemoteConfig polls the backend for dashboard-set configuration. Currently this is
-// just FIM watch paths - the first real implementation of the "config channel"
-// AGENT_SPEC.md has always described (dashboard -> backend -> agent), which previously
-// existed only as documentation with no code behind it.
+// fetchRemoteConfig polls the backend for dashboard-set configuration - FIM watch paths
+// and log sources to tail - the "config channel" AGENT_SPEC.md has always described
+// (dashboard -> backend -> agent), which previously existed only as documentation with
+// no code behind it until Batch E (FIM paths) and Batch K (log sources).
 func fetchRemoteConfig(backendURL, serverID, apiKey string) (*remoteConfigResponse, error) {
 	url := fmt.Sprintf("%s/v1/agent/%s/config", backendURL, serverID)
 	resp, err := makeHTTPRequest("GET", url, apiKey, nil)
@@ -47,11 +48,11 @@ func stringSlicesEqual(a, b []string) bool {
 	return true
 }
 
-// mergeRemoteFIMPaths is the pure, testable core: given what's currently configured and
+// mergeRemoteStringList is the pure, testable core: given what's currently configured and
 // what the dashboard now says, decides what should be persisted and whether anything
 // actually changed - separated from the network fetch and file-save side effects so it
 // can be unit tested without a running backend.
-func mergeRemoteFIMPaths(current []string, remote []string) (merged []string, changed bool) {
+func mergeRemoteStringList(current []string, remote []string) (merged []string, changed bool) {
 	if stringSlicesEqual(current, remote) {
 		return current, false
 	}
@@ -69,15 +70,22 @@ func SyncRemoteConfig(config *Config, configPath string) {
 		return
 	}
 
-	merged, changed := mergeRemoteFIMPaths(config.FIMWatchPaths, remote.FIMWatchPaths)
-	if !changed {
+	fimMerged, fimChanged := mergeRemoteStringList(config.FIMWatchPaths, remote.FIMWatchPaths)
+	logSourcesMerged, logSourcesChanged := mergeRemoteStringList(config.LogSources, remote.LogSources)
+	if !fimChanged && !logSourcesChanged {
 		return
 	}
 
-	config.FIMWatchPaths = merged
+	config.FIMWatchPaths = fimMerged
+	config.LogSources = logSourcesMerged
 	if err := SaveConfig(configPath, config); err != nil {
 		log.Printf("Config sync: failed to save updated config: %v", err)
 		return
 	}
-	log.Printf("Config sync: updated FIM watch paths from dashboard (%d paths)", len(merged))
+	if fimChanged {
+		log.Printf("Config sync: updated FIM watch paths from dashboard (%d paths)", len(fimMerged))
+	}
+	if logSourcesChanged {
+		log.Printf("Config sync: updated log sources from dashboard (%d sources)", len(logSourcesMerged))
+	}
 }

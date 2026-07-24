@@ -257,28 +257,35 @@ router.post('/:serverId/rescan', authenticate, async (req: AuthRequest, res: Res
   }
 });
 
-// Dashboard-facing agent configuration (e.g. FIM watch paths - see AGENT_SPEC.md's
-// "config channel"). Stored as JSON on Server.desiredConfig; the agent polls
-// GET /v1/agent/:serverId/config (routes/agent.ts) to pick up changes.
+// Dashboard-facing agent configuration (e.g. FIM watch paths, log sources to tail - see
+// AGENT_SPEC.md's "config channel"). Stored as JSON on Server.desiredConfig; the agent
+// polls GET /v1/agent/:serverId/config (routes/agent.ts) to pick up changes.
 router.get('/:serverId/config', authenticate, async (req: AuthRequest, res: Response) => {
   const server = await loadOwnedServer(req, res);
   if (!server) return;
 
   const fullServer = await prisma.server.findUnique({ where: { id: server.id }, select: { desiredConfig: true } });
-  const config = fullServer?.desiredConfig ? JSON.parse(fullServer.desiredConfig) : { fimWatchPaths: [] };
-  res.json(config);
+  const stored = fullServer?.desiredConfig ? JSON.parse(fullServer.desiredConfig) : {};
+  // Defaults fill in keys older saved configs (pre-Batch K) won't have yet.
+  res.json({ fimWatchPaths: stored.fimWatchPaths ?? [], logSources: stored.logSources ?? [] });
 });
 
 router.put('/:serverId/config', authenticate, async (req: AuthRequest, res: Response) => {
   const server = await loadOwnedServer(req, res);
   if (!server) return;
 
-  const { fimWatchPaths } = req.body;
+  const { fimWatchPaths, logSources } = req.body;
   if (fimWatchPaths !== undefined && !Array.isArray(fimWatchPaths)) {
     return res.status(400).json({ error: 'fimWatchPaths must be an array of strings' });
   }
+  if (logSources !== undefined && !Array.isArray(logSources)) {
+    return res.status(400).json({ error: 'logSources must be an array of strings' });
+  }
 
-  const config = { fimWatchPaths: Array.isArray(fimWatchPaths) ? fimWatchPaths.filter((p) => typeof p === 'string') : [] };
+  const config = {
+    fimWatchPaths: Array.isArray(fimWatchPaths) ? fimWatchPaths.filter((p) => typeof p === 'string') : [],
+    logSources: Array.isArray(logSources) ? logSources.filter((p) => typeof p === 'string') : [],
+  };
 
   await prisma.server.update({
     where: { id: server.id },

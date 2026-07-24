@@ -60,6 +60,7 @@ interface ApplicationRow {
 
 interface ServerConfig {
   fimWatchPaths: string[];
+  logSources: string[];
 }
 
 interface AISuggestion {
@@ -83,6 +84,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const [applications, setApplications] = useState<ApplicationRow[] | null>(null);
   const [config, setConfig] = useState<ServerConfig | null>(null);
   const [fimPathsText, setFimPathsText] = useState("");
+  const [logSourcesText, setLogSourcesText] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
   const [error, setError] = useState("");
   const [rescanning, setRescanning] = useState(false);
@@ -114,6 +116,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
         .then((cfg) => {
           setConfig(cfg);
           setFimPathsText((cfg.fimWatchPaths ?? []).join("\n"));
+          setLogSourcesText((cfg.logSources ?? []).join("\n"));
         })
         .catch((e) => setError(describe(e)));
     }
@@ -127,8 +130,12 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
       .split("\n")
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
+    const logSources = logSourcesText
+      .split("\n")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
     try {
-      const updated = await api.put<ServerConfig>(`/v1/servers/${id}/config`, { fimWatchPaths }, token);
+      const updated = await api.put<ServerConfig>(`/v1/servers/${id}/config`, { fimWatchPaths, logSources }, token);
       setConfig(updated);
     } catch (e) {
       setError(describe(e));
@@ -405,6 +412,23 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
                 placeholder={"/etc/nginx/nginx.conf\n/etc/myapp/config.yaml"}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
               />
+
+              <div className="pt-2">
+                <h2 className="text-lg font-medium text-gray-900">Log sources to tail</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  One file path or glob per line (e.g. <code>/var/log/nginx/*.log</code>). ERROR/WARNING lines are
+                  surfaced in the server timeline and the daily Log Intelligence digest. New sources are picked up
+                  within about an hour; removing a source here takes effect on the agent&apos;s next restart.
+                </p>
+              </div>
+              <textarea
+                value={logSourcesText}
+                onChange={(e) => setLogSourcesText(e.target.value)}
+                rows={6}
+                placeholder={"/var/log/nginx/*.log\n/var/log/myapp/app.log"}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+              />
+
               <button
                 onClick={handleSaveConfig}
                 disabled={savingConfig}

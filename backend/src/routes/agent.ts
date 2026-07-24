@@ -94,8 +94,8 @@ router.post('/register', async (req: Request, res: Response) => {
 // dashboard-facing side). Returns whatever the dashboard has set, or empty defaults.
 router.get('/:serverId/config', authenticateAgent, async (req: AgentRequest, res: Response) => {
   const server = await prisma.server.findUnique({ where: { id: req.server.id }, select: { desiredConfig: true } });
-  const config = server?.desiredConfig ? JSON.parse(server.desiredConfig) : { fimWatchPaths: [] };
-  res.json({ fim_watch_paths: config.fimWatchPaths ?? [] });
+  const config = server?.desiredConfig ? JSON.parse(server.desiredConfig) : {};
+  res.json({ fim_watch_paths: config.fimWatchPaths ?? [], log_sources: config.logSources ?? [] });
 });
 
 // Batch F: Telemetry Ingestion
@@ -190,6 +190,39 @@ router.post('/:serverId/events', authenticateAgent, async (req: AgentRequest, re
   } catch (error: any) {
     console.error('Error saving threat event:', error);
     res.status(500).json({ error: 'Failed to process threat event' });
+  }
+});
+
+const LOG_EVENT_MESSAGE_MAX_LEN = 500;
+const VALID_LOG_LEVELS = ['ERROR', 'WARNING'];
+
+// Batch K: generic dashboard-configured log tailing (agent/logwatch.go). Deliberately
+// separate from /:serverId/events above - this is app-log noise classified by a simple
+// keyword heuristic, not a security detection, so it never touches ThreatEvent or
+// auto-remediation. Creates only a TimelineEvent, which generateDailyDigest() in
+// services/ai/logdigest.ts already knows how to fold into its ERROR/WARNING counts.
+router.post('/:serverId/log-events', authenticateAgent, async (req: AgentRequest, res: Response) => {
+  const serverId = req.server.id;
+  const { source, level, message } = req.body;
+
+  if (!source || !VALID_LOG_LEVELS.includes(level) || typeof message !== 'string') {
+    return res.status(400).json({ error: 'source, level (ERROR|WARNING), and message are required' });
+  }
+
+  try {
+    await prisma.timelineEvent.create({
+      data: {
+        serverId,
+        eventCategory: level,
+        title: `${source}: ${level}`,
+        description: message.slice(0, LOG_EVENT_MESSAGE_MAX_LEN),
+      },
+    });
+
+    res.status(202).json({ message: 'Log event recorded' });
+  } catch (error: any) {
+    console.error('Error saving log event:', error);
+    res.status(500).json({ error: 'Failed to process log event' });
   }
 });
 

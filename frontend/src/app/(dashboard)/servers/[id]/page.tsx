@@ -58,7 +58,11 @@ interface ApplicationRow {
   port: number | null;
 }
 
-type Tab = "overview" | "security" | "threats" | "timeline" | "applications";
+interface ServerConfig {
+  fimWatchPaths: string[];
+}
+
+type Tab = "overview" | "security" | "threats" | "timeline" | "applications" | "configuration";
 
 export default function ServerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
@@ -70,6 +74,9 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const [threats, setThreats] = useState<ThreatEvent[] | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[] | null>(null);
   const [applications, setApplications] = useState<ApplicationRow[] | null>(null);
+  const [config, setConfig] = useState<ServerConfig | null>(null);
+  const [fimPathsText, setFimPathsText] = useState("");
+  const [savingConfig, setSavingConfig] = useState(false);
   const [error, setError] = useState("");
   const [rescanning, setRescanning] = useState(false);
   const [fixingId, setFixingId] = useState<string | null>(null);
@@ -93,7 +100,34 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
     if (tab === "applications" && applications === null) {
       api.get<ApplicationRow[]>(`/v1/servers/${id}/applications`, token).then(setApplications).catch((e) => setError(describe(e)));
     }
-  }, [tab, token, id, findings, threats, timeline, applications]);
+    if (tab === "configuration" && config === null) {
+      api
+        .get<ServerConfig>(`/v1/servers/${id}/config`, token)
+        .then((cfg) => {
+          setConfig(cfg);
+          setFimPathsText((cfg.fimWatchPaths ?? []).join("\n"));
+        })
+        .catch((e) => setError(describe(e)));
+    }
+  }, [tab, token, id, findings, threats, timeline, applications, config]);
+
+  const handleSaveConfig = async () => {
+    if (!token) return;
+    setSavingConfig(true);
+    setError("");
+    const fimWatchPaths = fimPathsText
+      .split("\n")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    try {
+      const updated = await api.put<ServerConfig>(`/v1/servers/${id}/config`, { fimWatchPaths }, token);
+      setConfig(updated);
+    } catch (e) {
+      setError(describe(e));
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   const handleRescan = async () => {
     if (!token) return;
@@ -135,6 +169,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
     { key: "threats", label: "Threats" },
     { key: "timeline", label: "Timeline" },
     { key: "applications", label: "Applications" },
+    { key: "configuration", label: "Configuration" },
   ];
 
   return (
@@ -276,6 +311,38 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
             </div>
           )}
         />
+      )}
+
+      {tab === "configuration" && (
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-medium text-gray-900">File Integrity Monitoring watch paths</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              One file path per line. Leave empty to use the defaults (common nginx/Apache config paths). Changes
+              reach the agent within about an hour, on its next scheduled scan.
+            </p>
+          </div>
+          {config === null ? (
+            <div className="text-center text-gray-500 py-8">Loading...</div>
+          ) : (
+            <>
+              <textarea
+                value={fimPathsText}
+                onChange={(e) => setFimPathsText(e.target.value)}
+                rows={8}
+                placeholder={"/etc/nginx/nginx.conf\n/etc/myapp/config.yaml"}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+              />
+              <button
+                onClick={handleSaveConfig}
+                disabled={savingConfig}
+                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingConfig ? "Saving..." : "Save Configuration"}
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

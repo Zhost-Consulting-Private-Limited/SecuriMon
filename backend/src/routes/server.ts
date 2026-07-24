@@ -256,6 +256,37 @@ router.post('/:serverId/rescan', authenticate, async (req: AuthRequest, res: Res
   }
 });
 
+// Dashboard-facing agent configuration (e.g. FIM watch paths - see AGENT_SPEC.md's
+// "config channel"). Stored as JSON on Server.desiredConfig; the agent polls
+// GET /v1/agent/:serverId/config (routes/agent.ts) to pick up changes.
+router.get('/:serverId/config', authenticate, async (req: AuthRequest, res: Response) => {
+  const server = await loadOwnedServer(req, res);
+  if (!server) return;
+
+  const fullServer = await prisma.server.findUnique({ where: { id: server.id }, select: { desiredConfig: true } });
+  const config = fullServer?.desiredConfig ? JSON.parse(fullServer.desiredConfig) : { fimWatchPaths: [] };
+  res.json(config);
+});
+
+router.put('/:serverId/config', authenticate, async (req: AuthRequest, res: Response) => {
+  const server = await loadOwnedServer(req, res);
+  if (!server) return;
+
+  const { fimWatchPaths } = req.body;
+  if (fimWatchPaths !== undefined && !Array.isArray(fimWatchPaths)) {
+    return res.status(400).json({ error: 'fimWatchPaths must be an array of strings' });
+  }
+
+  const config = { fimWatchPaths: Array.isArray(fimWatchPaths) ? fimWatchPaths.filter((p) => typeof p === 'string') : [] };
+
+  await prisma.server.update({
+    where: { id: server.id },
+    data: { desiredConfig: JSON.stringify(config) },
+  });
+
+  res.json(config);
+});
+
 // Dashboard Route to trigger a remediation fix manually
 router.post('/:serverId/findings/:findingId/fix', authenticate, async (req: AuthRequest, res: Response) => {
   const tenantId = req.user?.tenantId;

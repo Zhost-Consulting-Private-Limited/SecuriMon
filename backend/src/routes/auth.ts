@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma';
 import { authenticate, AuthRequest } from '../middlewares/auth';
+import { signToken } from '../utils/jwt';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'vigilon-super-secret-key-change-in-prod';
-const JWT_EXPIRES_IN = '1d';
+const MIN_PASSWORD_LENGTH = 8;
 
 // Temporary route to create the first tenant and user for testing
 router.post('/register', async (req: Request, res: Response) => {
@@ -14,6 +13,10 @@ router.post('/register', async (req: Request, res: Response) => {
 
   if (!tenantName || !email || !password) {
     return res.status(400).json({ error: 'Tenant name, email, and password are required' });
+  }
+
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -40,7 +43,7 @@ router.post('/register', async (req: Request, res: Response) => {
   });
 
   const user = tenant.users[0];
-  const token = jwt.sign({ id: user.id, tenantId: tenant.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const token = signToken({ id: user.id, tenantId: tenant.id, role: user.role });
 
   res.status(201).json({
     message: 'Registration successful',
@@ -67,7 +70,7 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  const token = jwt.sign({ id: user.id, tenantId: user.tenantId, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const token = signToken({ id: user.id, tenantId: user.tenantId, role: user.role });
 
   res.json({
     message: 'Login successful',
@@ -81,7 +84,7 @@ router.post('/refresh', authenticate, async (req: AuthRequest, res: Response) =>
   const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const token = jwt.sign({ id: user.id, tenantId: user.tenantId, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const token = signToken({ id: user.id, tenantId: user.tenantId, role: user.role });
   res.json({ token, user: { id: user.id, email: user.email, role: user.role, tenantId: user.tenantId } });
 });
 
@@ -100,9 +103,7 @@ router.post('/switch-tenant', authenticate, async (req: AuthRequest, res: Respon
     return res.status(403).json({ error: 'Not an MSP-managed tenant for this account' });
   }
 
-  const token = jwt.sign({ id: req.user!.id, tenantId: targetTenant.id, role: req.user!.role }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
+  const token = signToken({ id: req.user!.id, tenantId: targetTenant.id, role: req.user!.role });
 
   res.json({ token, tenant: { id: targetTenant.id, name: targetTenant.name } });
 });

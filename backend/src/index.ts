@@ -2,6 +2,8 @@ import 'dotenv/config';
 import 'express-async-errors'; // Handles async errors in express routes
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import http from 'http';
 import path from 'path';
 import authRoutes from './routes/auth';
@@ -20,7 +22,41 @@ import { startAlertEvaluator } from './services/alerts/evaluator';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Restricts which browser origins may call this API with credentials. Defaults to the
+// local frontend dev server so nothing extra needs configuring for local development;
+// production deployments must set CORS_ORIGIN (comma-separated) to their real frontend URL(s).
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+// This is a pure JSON API consumed by a separate-origin frontend (already governed by
+// the explicit CORS allowlist below), so the cross-origin-resource-policy default of
+// "same-origin" would incorrectly block the frontend's own fetch calls - relax just that.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+
+// Strict limiter on auth endpoints - the highest-value target for credential
+// stuffing/brute-force and registration spam.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts, please try again later' },
+});
+app.use(['/v1/auth/login', '/v1/auth/register'], authLimiter);
+
+// Generous global safety-net limiter for everything else - deliberately loose so it
+// never throttles legitimate multi-server agent fleets on their normal polling schedule
+// (60s telemetry ticks, hourly scans, etc.) while still guarding against gross abuse.
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 2000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
 
 // Razorpay webhook signature verification needs the exact raw request bytes, so this
 // must be registered with express.raw() BEFORE the global express.json() body parser,

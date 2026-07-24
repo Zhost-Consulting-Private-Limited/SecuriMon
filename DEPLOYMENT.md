@@ -34,14 +34,14 @@ SMTP_PASS=""
 # RAZORPAY_* keys are not used in self_hosted mode — leave unset
 ```
 
-### 2. Install, sync schema, build, run
+### 2. Install, apply migrations, build, run
 ```bash
 npm install
-npx prisma db push
+npx prisma migrate deploy
 npm run build
 pm2 start dist/index.js --name vigilon-backend
 ```
-(This project uses `prisma db push` rather than tracked migrations — there is no `prisma/migrations` history yet. If you need real migration history for a production SaaS deployment, run `npx prisma migrate dev --name init` once locally to generate one before switching to `migrate deploy`.)
+(Schema changes are tracked as real migrations under `backend/prisma/migrations/` — `migrate deploy` applies any that aren't yet applied to this database, in order, without prompting. To add a *new* schema change going forward: edit `schema.prisma`, run `npx prisma migrate dev --name <short-description>` locally to generate and apply the migration against your dev database, commit the generated `prisma/migrations/<timestamp>_<name>/migration.sql`, then run `migrate deploy` in every other environment.)
 
 ### 3. Build and run the frontend
 ```bash
@@ -68,7 +68,7 @@ Nginx: proxy `/` to the frontend port, `/api`/`/v1` (per your `NEXT_PUBLIC_API_U
 ### Upgrading
 ```bash
 git pull
-cd backend && npm install && npx prisma db push && npm run build && pm2 restart vigilon-backend
+cd backend && npm install && npx prisma migrate deploy && npm run build && pm2 restart vigilon-backend
 cd ../frontend && npm install && npm run build && pm2 restart vigilon-frontend
 ```
 
